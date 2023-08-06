@@ -4,6 +4,7 @@ import json
 from enum import Enum
 import gymnasium as gym
 from environment import Env2048
+from greedy import GreedyAgent
 
 np.random.seed(42)
 
@@ -30,6 +31,8 @@ env.render()
 
 history = [env.board.copy()]
 
+mrGreedy = GreedyAgent()
+player = 'AI'
 running = True
 while running:
     
@@ -39,10 +42,14 @@ while running:
             running = False
         
         if event.type == pg.KEYDOWN:
-            if event.key in direction_from_pg.keys():
-                direction = direction_from_pg[event.key]
+            if player == 'human':
+                if event.key in direction_from_pg.keys():
+                    direction = direction_from_pg[event.key]
+            else:
+                direction = mrGreedy.move(env)
+        #pg.time.delay(2000)
 
-    if direction:
+    if direction is not None:
         board, reward, terminated, _ = env.step(direction)
         history.append(board.copy())
         print('')

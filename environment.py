@@ -14,6 +14,8 @@ class Env2048(gym.Env):
     metadata = {"render_modes": ["ansi","human"]}
 
     PROB_2 = 0.9
+    WIDTH = 4
+    HEIGHT = 4
 
     action_to_int = {
         'down': 0,
@@ -22,13 +24,10 @@ class Env2048(gym.Env):
         'right': 3
     }
 
-    def __init__(self, render_mode='ansi', width=4, height=4, empty=False):
-        self.width = width
-        self.height = height
-
+    def __init__(self, render_mode='ansi', empty=False):
         self.observation_space = spaces.Box(low=0,
                                             high=2**16,
-                                            shape=(self.width, self.height),
+                                            shape=(Env2048.HEIGHT, Env2048.WIDTH),
                                             dtype=np.int32)
         self.action_space = spaces.Discrete(4)
 
@@ -37,14 +36,14 @@ class Env2048(gym.Env):
 
         self.screen = None
 
-        self.board = np.zeros((self.height, self.width), dtype=np.int32)
+        self.board = np.zeros((Env2048.HEIGHT, Env2048.WIDTH), dtype=np.int32)
         if not empty:
             self.reset()
 
     def reset(self):
-        self.board = np.zeros((self.height, self.width), dtype=np.int32)
-        self._place_random_tile()
-        self._place_random_tile()
+        self.board = np.zeros((Env2048.HEIGHT, Env2048.WIDTH), dtype=np.int32)
+        Env2048._place_random_tile(self.board)
+        Env2048._place_random_tile(self.board)
         return self.board
     
     def render(self):
@@ -58,68 +57,75 @@ class Env2048(gym.Env):
     def close(self):
         pass
     
-    def _sample_tile(self):
+    @staticmethod
+    def _sample_tile():
         if np.random.random() < Env2048.PROB_2:
             return 2
         else:
             return 4
 
-    def _place_random_tile(self):
-        zero_coords = np.argwhere(self.board == 0)
+    @staticmethod
+    def _place_random_tile(board):
+        # TODO make this not be in place? or make other static methods be in place
+        zero_coords = np.argwhere(board == 0)
         if len(zero_coords) > 0:
             random_index = np.random.randint(0,len(zero_coords))
             c = zero_coords[random_index]
-            self.board[c[0]][c[1]] = self._sample_tile()
+            board[c[0]][c[1]] = Env2048._sample_tile()
+        return board
     
-    def is_done(self):
-        zero_coords = np.argwhere(self.board == 0)
+    @staticmethod
+    def is_done(board):
+        zero_coords = np.argwhere(board == 0)
         if len(zero_coords) > 0:
             return False
         
         def exists_mergeable(board):
             # Tests if two vertically adjacent tiles can be combined on board
-            for col in range(self.width):
-                for row in range(1,self.height):
+            for col in range(Env2048.WIDTH):
+                for row in range(1,Env2048.HEIGHT):
                     if board[row-1][col] == board[row][col]:
                         return True
             return False
 
-        board_rotated = np.rot90(self.board)  # TODO make sure this does not modify in place
-        return not exists_mergeable(self.board) and not exists_mergeable(board_rotated)
+        board_rotated = np.rot90(board)
+        return not exists_mergeable(board) and not exists_mergeable(board_rotated)
 
-
-    def step(self, move, verbose=False):
+    @staticmethod
+    def _step(board, move):
         if isinstance(move, str):
             move = Env2048.action_to_int[move]
         
-        board_copy = self.board.copy()
+        board_copy = board.copy()
 
-        board_rotated = np.rot90(self.board, k=move)
-        board_updated, reward = self._move_down(board_rotated)
-        self.board = np.rot90(board_updated, k=4-move)
+        board_rotated = np.rot90(board, k=move)  # note that the rotated board is a view of the original array (still linked)
+        board_updated, reward = Env2048._move_down(board_rotated)
+        board_result = np.rot90(board_updated, k=4-move)
 
-        board_changed = not np.array_equal(board_copy, self.board)
-        if board_changed:
-            self._place_random_tile()
+        # directions that don't slide/combine any tiles are not valid (but also don't give any points)
+        valid_move = not np.array_equal(board_copy, board_result)
+        if valid_move:
+            Env2048._place_random_tile(board_result)
+        info = {'valid_move': valid_move}
 
-        done = self.is_done()
+        done = Env2048.is_done(board_result)
 
-        if verbose:
-            movestr = {0: 'down', 1: 'left', 2: 'up', 3: 'right'}[move]
-            print(f"move: {movestr}")
-            self.render()
-
-        return self.board, reward, done, {}
+        return board_result, reward, done, info
     
-
-    def _move_down(self, board):
+    def step(self, move):
+        board, reward, done, info = Env2048._step(self.board, move)
+        self.board = board
+        return board, reward, done, info
+    
+    @staticmethod
+    def _move_down(board):
         reward = 0
         # Handle each column independently
-        for col in range(self.width):
-            target_row = self.height - 1
+        for col in range(Env2048.WIDTH):
+            target_row = Env2048.HEIGHT - 1
 
             # moving row gets values height-2 to 0. Maintain that moving_row < target_row. 
-            for moving_row in reversed(range(self.height - 1)):
+            for moving_row in reversed(range(Env2048.HEIGHT - 1)):
                 # nothing to move
                 if board[moving_row][col] == 0:
                     continue
