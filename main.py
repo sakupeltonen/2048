@@ -50,3 +50,7 @@ while running:
 
 
 pg.quit()
+
+# TODO apparently already implemented. Not sure how we can pass the screen to the environment
+# mapping = {(pygame.K_LEFT,): 0, (pygame.K_RIGHT,): 1}
+# play(gym.make("CartPole-v0"), keys_to_action=mapping)
