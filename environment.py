@@ -1,14 +1,17 @@
 import numpy as np
-# import pygame
+import pygame
+import json
 
 import gymnasium as gym
 from gymnasium import spaces
 
-
+constants = json.load(open("constants.json", "r"))
+theme = 'light'
+# my_font = pygame.font.SysFont(constants["font"], constants["font_size"], bold=True)
 
 
 class Env2048(gym.Env):
-    metadata = {"render_modes": ["ansi"]}
+    metadata = {"render_modes": ["ansi","human"]}
 
     PROB_2 = 0.9
 
@@ -32,6 +35,8 @@ class Env2048(gym.Env):
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
 
+        self.screen = None
+
         self.board = np.zeros((self.height, self.width), dtype=np.int32)
         if not empty:
             self.reset()
@@ -46,6 +51,9 @@ class Env2048(gym.Env):
         if self.render_mode == 'ansi':
             for row in self.board:
                 print(' \t'.join(map(str, row)))
+
+        if self.render_mode == 'human':
+            self._render_pygame()
 
     def close(self):
         pass
@@ -165,3 +173,33 @@ class Env2048(gym.Env):
         env.board = board
         env.render()
         return env
+    
+    def _render_pygame(self):
+        """
+        Credits to github.com/rajitbanerjee/2048-pygame/
+        """
+        assert self.screen is not None
+        
+        my_font = pygame.font.SysFont(constants["font"], constants["font_size"], bold=True)
+        
+        self.screen.fill(tuple(constants["colour"][theme]["background"]))
+        box = constants["size"] // 4
+        padding = constants["padding"]
+        for i in range(4):
+            for j in range(4):
+                colour = tuple(constants["colour"][theme][str(self.board[i][j])])
+                pygame.draw.rect(self.screen, colour, (j * box + padding,
+                                                i * box + padding,
+                                                box - 2 * padding,
+                                                box - 2 * padding), 0)
+                if self.board[i][j] != 0:
+                    if self.board[i][j] in (2, 4):
+                        text_colour = tuple(constants["colour"][theme]["dark"])
+                    else:
+                        text_colour = tuple(constants["colour"][theme]["light"])
+                    # display the number at the centre of the tile
+                    self.screen.blit(my_font.render("{:>4}".format(
+                        self.board[i][j]), 1, text_colour),
+                        (j * box + 2.5 * padding, i * box + 7 * padding))
+        pygame.display.update()
+
