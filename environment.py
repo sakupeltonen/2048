@@ -53,6 +53,7 @@ class Env2048(gym.Env):
         if mode == 'ansi':
             for row in self.board:
                 print(' \t'.join(map(str, row)))
+            print("")
 
         if mode == 'human':
             self._render_pygame()
