@@ -46,12 +46,15 @@ class Env2048(gym.Env):
         Env2048._place_random_tile(self.board)
         return self.board
     
-    def render(self):
-        if self.render_mode == 'ansi':
+    def render(self,mode=None):
+        if mode is None: 
+            mode = self.render_mode
+
+        if mode == 'ansi':
             for row in self.board:
                 print(' \t'.join(map(str, row)))
 
-        if self.render_mode == 'human':
+        if mode == 'human':
             self._render_pygame()
 
     def close(self):
@@ -92,7 +95,7 @@ class Env2048(gym.Env):
         return not exists_mergeable(board) and not exists_mergeable(board_rotated)
 
     @staticmethod
-    def _step(board, move):
+    def _step(board, move, generate=True):
         if isinstance(move, str):
             move = Env2048.action_to_int[move]
         
@@ -104,7 +107,8 @@ class Env2048(gym.Env):
 
         # directions that don't slide/combine any tiles are not valid (but also don't give any points)
         valid_move = not np.array_equal(board_copy, board_result)
-        if valid_move:
+        # A new tile is generated if the move is valid. generate=False turns off new tile generation
+        if valid_move and generate:
             Env2048._place_random_tile(board_result)
         info = {'valid_move': valid_move}
 
@@ -151,8 +155,8 @@ class Env2048(gym.Env):
         return board, reward
 
     @classmethod
-    def random_state(cls, max_power=6, n_tiles=8):
-        env = Env2048(empty=True)
+    def random_state(cls, max_power=6, n_tiles=8,render_mode='ansi'):
+        env = Env2048(empty=True,render_mode=render_mode)
         
         all_coords = [(y,x) for y in range(env.height) for x in range(env.width)]  # get list of all coordinates
         random_subset_indices = np.random.choice(len(all_coords), n_tiles, replace=False)
@@ -168,16 +172,26 @@ class Env2048(gym.Env):
         return env
     
     @classmethod
-    def custom_state(cls, tiles, width=4, height=4):
-        board = np.zeros((height, width), dtype=np.int32)
+    def custom_state(cls, tiles, render_mode='ansi'):
+        """
+           Generate a custom initial state.
+        
+           Parameters:
+           tiles ([int]): One-dimensional list of tiles in row-major order
+
+           Notes:
+           TODO might be good to combine this with env.reset
+        """
+        assert len(tiles) == Env2048.HEIGHT * Env2048.WIDTH
+        board = np.zeros((Env2048.HEIGHT, Env2048.WIDTH), dtype=np.int32)
         i = 0
-        for y in range(height):
-            for x in range(width):
+        for y in range(Env2048.HEIGHT):
+            for x in range(Env2048.WIDTH):
                 board[y][x] = tiles[i]
                 i += 1
-        env = Env2048(empty=True, width=width, height=height)
+        env = Env2048(empty=True, render_mode=render_mode)
         env.board = board
-        env.render()
+        env.render(mode='ansi')
         return env
     
     def _render_pygame(self):

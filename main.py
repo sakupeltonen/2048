@@ -18,42 +18,50 @@ direction_from_pg = {
 }
 
 
-# a = Env2048.custom_state([4,2,4,2,2,4,2,4,4,2,4,2,2,4,2,4])
 
 pg.init()
 screen = pg.display.set_mode((constants["size"], constants["size"]))
 pg.display.set_caption("2048")
 
-env = Env2048(render_mode='human')
+# env = Env2048(render_mode='human')
+# _ = env.reset()
+env = Env2048.custom_state([16,128,16,128,64,8,64,8,256,1024,256,1024,32,64,0,0],render_mode='human')
 env.screen = screen
-observation = env.reset()
 env.render()
 
 history = [env.board.copy()]
 
-mrGreedy = GreedyAgent()
-player = 'AI'
-running = True
-while running:
+greedy = GreedyAgent()
+player = 'human'
+pg_running = True
+terminated = False
+score = 0
+while pg_running:
     
     direction = None
     for event in pg.event.get():
         if event.type == pg.QUIT:
-            running = False
+            pg_running = False
         
-        if event.type == pg.KEYDOWN:
-            if player == 'human':
-                if event.key in direction_from_pg.keys():
-                    direction = direction_from_pg[event.key]
-            else:
-                direction = mrGreedy.move(env)
-        #pg.time.delay(2000)
+        if not terminated:
 
-    if direction is not None:
-        board, reward, terminated, _ = env.step(direction)
-        history.append(board.copy())
-        print('')
-        env.render()
+            if event.type == pg.KEYDOWN:
+                if player == 'human':
+                    if event.key in direction_from_pg.keys():
+                        direction = direction_from_pg[event.key]
+                else:
+                    direction = greedy.search(env, depth=1)
+            #pg.time.delay(2000)
+
+        if direction is not None:
+            board, reward, terminated, _ = env.step(direction)
+            score += reward
+            history.append(board.copy())
+            print('')
+            env.render()
+
+            if terminated:
+                print(f"Game over. Total score: {score}")
 
 
 pg.quit()
