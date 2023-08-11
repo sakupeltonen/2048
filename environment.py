@@ -37,13 +37,14 @@ class Env2048(gym.Env):
         self.screen = None
 
         self.board = np.zeros((Env2048.HEIGHT, Env2048.WIDTH), dtype=np.int32)
+        self.score = 0
         if not empty:
             self.reset()
 
     def reset(self):
         self.board = np.zeros((Env2048.HEIGHT, Env2048.WIDTH), dtype=np.int32)
-        Env2048._place_random_tile(self.board)
-        Env2048._place_random_tile(self.board)
+        self.board = Env2048._place_random_tile(self.board)
+        self.board = Env2048._place_random_tile(self.board)
         return self.board
     
     def render(self,mode=None):
@@ -70,13 +71,13 @@ class Env2048(gym.Env):
 
     @staticmethod
     def _place_random_tile(board):
-        # TODO make this not be in place? or make other static methods be in place
         zero_coords = np.argwhere(board == 0)
+        res = board.copy()
         if len(zero_coords) > 0:
             random_index = np.random.randint(0,len(zero_coords))
             c = zero_coords[random_index]
-            board[c[0]][c[1]] = Env2048._sample_tile()
-        return board
+            res[c[0]][c[1]] = Env2048._sample_tile()
+        return res
     
     @staticmethod
     def is_done(board):
@@ -99,19 +100,20 @@ class Env2048(gym.Env):
     def _step(board, move, generate=True):
         if isinstance(move, str):
             move = Env2048.action_to_int[move]
-        
-        board_copy = board.copy()
 
-        board_rotated = np.rot90(board, k=move)  # note that the rotated board is a view of the original array (still linked)
+        board_rotated = np.rot90(board.copy(), k=move)  # note that the rotated board is a view of the original array (still linked)
         board_updated, reward = Env2048._move_down(board_rotated)
-        board_result = np.rot90(board_updated, k=4-move)
+        afterstate = np.rot90(board_updated, k=4-move)
 
         # directions that don't slide/combine any tiles are not valid (but also don't give any points)
-        valid_move = not np.array_equal(board_copy, board_result)
+        valid_move = not np.array_equal(board, afterstate)
         # A new tile is generated if the move is valid. generate=False turns off new tile generation
         if valid_move and generate:
-            Env2048._place_random_tile(board_result)
+            board_result = Env2048._place_random_tile(afterstate)
+        else:
+            board_result = afterstate
         info = {'valid_move': valid_move}
+        info['afterstate'] = afterstate
 
         done = Env2048.is_done(board_result)
 
@@ -120,6 +122,7 @@ class Env2048(gym.Env):
     def step(self, move):
         board, reward, done, info = Env2048._step(self.board, move)
         self.board = board
+        self.score += reward
         return board, reward, done, info
     
     @staticmethod
