@@ -4,6 +4,7 @@ import pickle
 import matplotlib.pyplot as plt
 import os
 from environment import Env2048
+from tools import save_game
 
 np.random.seed(42)
 
@@ -101,7 +102,6 @@ class NTupleNetwork:
             n_tuple.update(board, difference / len(changed_tuples))
 
 
-# TODO tuple seems to be a keyword, so should probably change that to sth else
 
 class TDAgent:
     def __init__(self, all_coords, max_val):
@@ -145,7 +145,7 @@ class TDAgent:
         return move
     
     def save(self, folder_path='agents/', name=None):
-        # TODO test
+        # TODO this will produce an unintuitive order for the agents when one deletes agent1 and keeps agent2
         base_filename = 'agent'
         extension = '.pkl'
         if name:
@@ -164,11 +164,11 @@ class TDAgent:
     def load(params, path):
         with open(path, 'rb') as file:
             NTN = pickle.load(file)
-        agent = TDAgent(params)
+        agent = TDAgent([], 1) # TODO fix the initialization. [],1 are temporary values that are only used to initialize the NTN, which is instantly overwritten by the one we load
         agent.NTN = NTN
         return agent
     
-    def learn_from_episode(self):
+    def learn_from_episode(self, save=False):
         env = Env2048()
         state = env.reset()
         history = [state]  # list of afterstates
@@ -190,6 +190,9 @@ class TDAgent:
         
         self.update(afterstate0, afterstate1, reward, done=True)
         # TODO add ending condition for reaching 2024
+
+        if save:
+            save_game(history, base_name='td')
 
         return env.score, np.max(afterstate1)
 
@@ -230,12 +233,13 @@ all_locations = [np.array(a) for a in all_locations]
 all_coords = [np.argwhere(locations == 1) for locations in all_locations]
 all_coords = [[tuple(row) for row in coords] for coords in all_coords]
 
-agent = TDAgent(all_coords, 11)
+# agent = TDAgent(all_coords, 11)
+agent = TDAgent.load('agents/agent1.pkl')
 
 episode = 0
 scores = []
 top_tiles = []
-while True:
+while episode < 100:
     score, top_tile = agent.learn_from_episode()
     print(f'Episode {episode}: score {score}, highest tile {top_tile}')
     episode += 1

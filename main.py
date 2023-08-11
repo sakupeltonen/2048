@@ -7,6 +7,7 @@ import os
 import pickle
 from environment import Env2048
 from greedy import GreedyAgent
+from tools import save_game
 
 np.random.seed(42)
 
@@ -50,19 +51,7 @@ def pg_main(initialize, handle_keypress):
 
 
 
-def save_game(history, folder_path='games/', name=None):
-    base_filename = 'game'
-    extension = '.pkl'
-    if name:
-        path = folder_path + name + extension
-    else: 
-        i = 1
-        while os.path.exists(os.path.join(folder_path, f'{base_filename}{i}{extension}')):
-            i += 1
-        path = os.path.join(folder_path, f'{base_filename}{i}{extension}')
 
-    with open(path, 'wb') as file:
-        pickle.dump(history, file)
 
 
 
