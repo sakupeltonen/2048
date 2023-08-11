@@ -144,10 +144,10 @@ class TDAgent:
         move, _ = max(list(evaluations.items()), key=lambda pair: pair[1])
         return move
     
-    def save(self, folder_path='agents', name=None):
+    def save(self, folder_path='agents/', name=None):
         # TODO test
         base_filename = 'agent'
-        extension = 'pkl'
+        extension = '.pkl'
         if name:
             path = folder_path + name + extension
         else: 

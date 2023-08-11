@@ -24,7 +24,7 @@ class Env2048(gym.Env):
         'right': 3
     }
 
-    def __init__(self, render_mode='ansi', empty=False):
+    def __init__(self, render_mode='ansi', screen=None):
         self.observation_space = spaces.Box(low=0,
                                             high=2**16,
                                             shape=(Env2048.HEIGHT, Env2048.WIDTH),
@@ -34,19 +34,35 @@ class Env2048(gym.Env):
         assert render_mode is None or render_mode in self.metadata["render_modes"]
         self.render_mode = render_mode
 
-        self.screen = None
+        self.screen = screen
 
         self.board = np.zeros((Env2048.HEIGHT, Env2048.WIDTH), dtype=np.int32)
         self.score = 0
-        if not empty:
-            self.reset()
+        
 
-    def reset(self):
-        self.board = np.zeros((Env2048.HEIGHT, Env2048.WIDTH), dtype=np.int32)
-        self.board = Env2048._place_random_tile(self.board)
-        self.board = Env2048._place_random_tile(self.board)
+    def reset(self, empty=False, custom_state=None):
+        if empty: 
+            return self.board
+        if custom_state is None:
+            self.board = np.zeros((Env2048.HEIGHT, Env2048.WIDTH), dtype=np.int32)
+            self.board = Env2048._place_random_tile(self.board)
+            self.board = Env2048._place_random_tile(self.board)
+        else:
+            # custom_state possibly given as a one-dimensional list (in row-major order), or 
+            # as a two-dimensional np.array
+            if isinstance(custom_state, list):
+                assert len(custom_state) == Env2048.HEIGHT * Env2048.WIDTH
+                i = 0
+                for y in range(Env2048.HEIGHT):
+                    for x in range(Env2048.WIDTH):
+                        self.board[y][x] = custom_state[i]
+                        i += 1
+            else:
+                self.board = custom_state
+
         return self.board
     
+
     def render(self,mode=None):
         if mode is None: 
             mode = self.render_mode
@@ -173,29 +189,6 @@ class Env2048(gym.Env):
             c = random_coords[i]
             env.board[c[0]][c[1]] = tiles[i]
 
-        return env
-    
-    @classmethod
-    def custom_state(cls, tiles, render_mode='ansi'):
-        """
-           Generate a custom initial state.
-        
-           Parameters:
-           tiles ([int]): One-dimensional list of tiles in row-major order
-
-           Notes:
-           TODO might be good to combine this with env.reset
-        """
-        assert len(tiles) == Env2048.HEIGHT * Env2048.WIDTH
-        board = np.zeros((Env2048.HEIGHT, Env2048.WIDTH), dtype=np.int32)
-        i = 0
-        for y in range(Env2048.HEIGHT):
-            for x in range(Env2048.WIDTH):
-                board[y][x] = tiles[i]
-                i += 1
-        env = Env2048(empty=True, render_mode=render_mode)
-        env.board = board
-        env.render(mode='ansi')
         return env
     
     def _render_pygame(self):

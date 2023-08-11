@@ -3,6 +3,8 @@ import pygame as pg
 import json
 from enum import Enum
 import gymnasium as gym
+import os
+import pickle
 from environment import Env2048
 from greedy import GreedyAgent
 
@@ -19,57 +21,111 @@ direction_from_pg = {
 
 
 
-pg.init()
-screen = pg.display.set_mode((constants["size"], constants["size"]))
-pg.display.set_caption("2048")
+def pg_main(initialize, handle_keypress):
+    pg.init()
+    screen = pg.display.set_mode((constants["size"], constants["size"]))
+    pg.display.set_caption("2048")
+    pg_running = True
+    terminated = False
 
-env = Env2048(render_mode='human')
-_ = env.reset()
-# env = Env2048.custom_state([16,128,16,128,64,8,64,8,256,1024,256,1024,32,64,0,0],render_mode='human')
-env.screen = screen
-env.render()
+    initialize(screen)
 
-history = [env.board.copy()]
-
-greedy = GreedyAgent()
-player = 'AI'
-pg_running = True
-terminated = False
-score = 0
-while pg_running:
-    
-    direction = None
-    for event in pg.event.get():
-        if event.type == pg.QUIT:
-            pg_running = False
-        
-        if not terminated:
-
-            if event.type == pg.KEYDOWN:
-                if player == 'human':
+    while pg_running:
+        direction = None
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg_running = False
+            
+            if not terminated:
+                if event.type == pg.KEYDOWN:
                     if event.key in direction_from_pg.keys():
                         direction = direction_from_pg[event.key]
-                else:
-                    direction = greedy.search(env, depth=5)
-            #pg.time.delay(2000)
 
-        if direction is not None:
-            board, reward, terminated, _ = env.step(direction)
-            score += reward
+            if direction is not None:
+                handle_keypress(direction)
+                
+                direction = None
+
+    pg.quit()
+
+
+
+def save_game(history, folder_path='games/', name=None):
+    base_filename = 'game'
+    extension = '.pkl'
+    if name:
+        path = folder_path + name + extension
+    else: 
+        i = 1
+        while os.path.exists(os.path.join(folder_path, f'{base_filename}{i}{extension}')):
+            i += 1
+        path = os.path.join(folder_path, f'{base_filename}{i}{extension}')
+
+    with open(path, 'wb') as file:
+        pickle.dump(history, file)
+
+
+
+def human_play(initial_state=None):
+    env = Env2048(render_mode='human')
+    _ = env.reset(custom_state=initial_state)
+    # _ = env.reset(custom_state=[16,128,16,128,64,8,64,8,256,1024,256,1024,32,64,0,0])
+
+    history = [env.board.copy()]
+    game_score = 0  # TODO fix score not being updated, outside of the scope of handle_keypress
+
+    def initialize(screen):
+        env.screen = screen
+        env.render()
+
+    def handle_keypress(direction):
+        nonlocal game_score
+        board, reward, terminated, info = env.step(direction)
+        game_score += reward
+        if not info['valid_move']:
+            print(f'{direction} is not a valid move')
+        else:
+            #score += reward
             history.append(board.copy())
             env.render()
-            print(direction)
+            print(f'{direction} -- total score {game_score}')
             env.render(mode='ansi')
 
             if terminated:
-                print(f"Game over. Total score: {score}")
-            
-            direction = None
+                print(f"Game over. Total score: {game_score}")
+
+    pg_main(initialize, handle_keypress)
+    save_game(history)
 
 
-pg.quit()
 
-# TODO rewrite game loop.
-# already implemented in gym. Not sure how we can pass the screen to the environment
-# mapping = {(pygame.K_LEFT,): 0, (pygame.K_RIGHT,): 1}
-# play(gym.make("CartPole-v0"), keys_to_action=mapping)
+def replay_game(path):
+    with open(path, 'rb') as file:
+        history = pickle.load(file)
+
+    state_index = 0
+    env = Env2048(render_mode='human')
+    _ = env.reset(custom_state=history[state_index])
+
+    def initialize(screen):
+        env.screen = screen
+        env.render()
+
+    def handle_keypress(direction):
+        nonlocal state_index
+        if direction == 'left':
+            if state_index > 0:
+                state_index -= 1
+
+        if direction == 'right':
+            if state_index < len(history) - 1:
+                state_index += 1
+
+        env.board = history[state_index]
+        env.render()
+
+    pg_main(initialize, handle_keypress)
+
+
+# human_play()
+replay_game('games/game1.pkl')
