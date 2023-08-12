@@ -117,4 +117,4 @@ def replay_game(path):
 
 
 # human_play()
-replay_game('games/game1.pkl')
+replay_game('games/td2.pkl')

@@ -184,7 +184,7 @@ class TDAgent:
             if t > 0: 
                 self.update(afterstate0, afterstate1, reward)
 
-            history.append(afterstate1)
+            history.append(state)
             afterstate0 = afterstate1
             t += 1
         
@@ -192,6 +192,10 @@ class TDAgent:
         # TODO add ending condition for reaching 2024
 
         if save:
+            save_game(history, base_name='td')
+        
+        # TEMP
+        if env.score > 3000:
             save_game(history, base_name='td')
 
         return env.score, np.max(afterstate1)
