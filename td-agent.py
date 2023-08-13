@@ -3,6 +3,7 @@ import random
 import pickle
 import matplotlib.pyplot as plt
 import os
+import math
 from environment import Env2048
 from tools import save_game
 
@@ -83,10 +84,37 @@ class NTuple:
 
 
 class NTupleNetwork:
-    def __init__(self, all_coords, max_val):
-        self.tuples = [NTuple(coords, max_val)
-                         for coords in all_coords]
-        # TODO add the 8 symmetries
+    def __init__(self, all_coords, max_val, symmetries=[]):
+        self.tuples = [] 
+        self.init_tuples(all_coords, max_val, symmetries)
+
+    def init_tuples(self, all_coords, max_val, symmetries):
+        def reflect_horizontal(coords):
+            return [(3-y,x) for (y,x) in coords]  # TODO remove hardcoded height 3
+        
+        def rotate_clockwise(coords):
+            # e.g. (y,x)=(3,3) --> (3,0); (y,x)=(2,1) --> (1,1) 
+            return [(x,3-y) for (y,x) in coords] # TODO remove hardcoded width 3
+
+        
+        for coords in all_coords:
+            rotated_coords = [(y,x) for (y,x) in coords]
+            reflected_rotated_coords = reflect_horizontal(coords)
+
+            original_n_tuple = NTuple(rotated_coords, max_val)
+            LUT = original_n_tuple.LUT
+            self.tuples.append(original_n_tuple)
+
+            copy_tuple = NTuple(reflected_rotated_coords, max_val, LUT=LUT)
+            self.tuples.append(copy_tuple)
+
+            for _ in range(3):
+                rotated_coords = rotate_clockwise(rotated_coords)
+                reflected_rotated_coords = rotate_clockwise(reflected_rotated_coords)
+
+                self.tuples.append(NTuple(rotated_coords, max_val,LUT=LUT))
+                self.tuples.append(NTuple(reflected_rotated_coords, max_val,LUT=LUT))
+
 
     def evaluate(self, board):
         res = 0
@@ -94,22 +122,32 @@ class NTupleNetwork:
             res += n_tuple.evaluate(board)
         return res
 
-    def update(self, board, difference, changed_indices):
+    def update_old(self, board, difference, changed_indices):
         changed_tuples = [n_tuple for n_tuple in self.tuples 
                           if len(changed_indices.intersection(set(n_tuple.coords))) > 0]
 
         for n_tuple in changed_tuples:
             n_tuple.update(board, difference / len(changed_tuples))
+    
+    def update_old(self, board, difference):
+        for n_tuple in self.tuples:
+            n_tuple.update(board, difference / len(self.tuples))
 
 
 
 class TDAgent:
     def __init__(self, all_coords, max_val):
-        NTN = NTupleNetwork(all_coords, max_val)
+        NTN = NTupleNetwork(all_coords, max_val, symmetries=['reflection','rotation'])
         self.NTN = NTN
         self.m = len(NTN.tuples)
+
+        self.history = []  # reset after each episode
+
         # TODO learning rate should appear somewhere
         self.learning_rate = 0.1
+        trace_decay = 0.60
+        self.trace_decay = trace_decay  # TD(lambda)
+        self.h = int(math.log(0.1, trace_decay))  # cutoff index for updating history. earlier states have a weight of < trace_decay^h = 0.1
 
     def evaluate(self, state, move):
         """
@@ -123,7 +161,7 @@ class TDAgent:
         v = self.NTN.evaluate(afterstate)
         return v + reward, info['valid_move']
     
-    def update(self, afterstate0, afterstate1, reward, done=False):
+    def update_old(self, afterstate0, afterstate1, reward, done=False):
         # TODO also update earlier states, stored in some history for the episode
         if not done:
             diff = reward + self.NTN.evaluate(afterstate1) - self.NTN.evaluate(afterstate0)
@@ -132,7 +170,27 @@ class TDAgent:
         # TODO remove hardcoding of board width and height
         changed_coords = set([(i,j) for i in range(4) for j in range(4) 
                           if afterstate0[i][j] != afterstate1[i][j]])
-        self.NTN.update(afterstate0, self.learning_rate * diff, changed_coords)
+        self.NTN.update_old(afterstate0, self.learning_rate * diff, changed_coords)
+
+    def update(self, reward, done=False):
+        if len(self.history) <= 1:
+            return
+        afterstate1 = self.history[-1]
+        afterstate0 = self.history[-2]
+        diff = reward + self.NTN.evaluate(afterstate1) - self.NTN.evaluate(afterstate0)
+        if done:
+            diff -= self.NTN.evaluate(afterstate1)
+
+        for k in range(1,self.h):
+            t = len(self.history) - k
+            if t < 0: 
+                return
+            afterstate = self.history[t]
+            # changed_coords = set([(i,j) for i in range(4) for j in range(4) 
+            #               if afterstate[i][j] != afterstate1[i][j]])
+            ## doesn't really make sense to only limit updating to changed coordinates now 
+            self.NTN.update(afterstate, self.learning_rate * diff * (self.trace_decay**k))
+
 
     # TODO some exploration?
     def move_greedy(self, state):
@@ -159,6 +217,7 @@ class TDAgent:
 
         with open(path, 'wb') as file:
             pickle.dump(self.NTN, file)
+        print(f'Agent saved in {path}')
     
     @classmethod
     def load(params, path):
@@ -166,6 +225,7 @@ class TDAgent:
             NTN = pickle.load(file)
         agent = TDAgent([], 1) # TODO fix the initialization. [],1 are temporary values that are only used to initialize the NTN, which is instantly overwritten by the one we load
         agent.NTN = NTN
+        print(f'Agent loaded from {path}')
         return agent
     
     def learn_from_episode(self, save=False):
@@ -181,22 +241,21 @@ class TDAgent:
             state, reward, done, info = env.step(move)
             afterstate1 = info['afterstate']
 
-            if t > 0: 
-                self.update(afterstate0, afterstate1, reward)
+            self.update(reward)
 
             history.append(state)
             afterstate0 = afterstate1
             t += 1
         
-        self.update(afterstate0, afterstate1, reward, done=True)
+        self.update(reward, done=True)
         # TODO add ending condition for reaching 2024
 
         if save:
             save_game(history, base_name='td')
         
         # TEMP
-        if env.score > 3000:
-            save_game(history, base_name='td')
+        # if env.score > 3000:
+        #     save_game(history, base_name='td')
 
         return env.score, np.max(afterstate1)
 
@@ -237,19 +296,25 @@ all_locations = [np.array(a) for a in all_locations]
 all_coords = [np.argwhere(locations == 1) for locations in all_locations]
 all_coords = [[tuple(row) for row in coords] for coords in all_coords]
 
-# agent = TDAgent(all_coords, 11)
-agent = TDAgent.load('agents/agent1.pkl')
+
+# agent = TDAgent.load('agents/agent3.pkl')
+agent = TDAgent(all_coords, 11)
 
 episode = 0
 scores = []
 top_tiles = []
-while episode < 100:
+update_freq = 100
+while True:
     score, top_tile = agent.learn_from_episode()
-    print(f'Episode {episode}: score {score}, highest tile {top_tile}')
+    
     episode += 1
     scores.append(score)
     top_tiles.append(top_tile)
 
+    if episode % update_freq == 0:
+        avg_score = np.mean(scores[episode-update_freq:])
+        avg_top_tile = np.mean(top_tiles[episode-update_freq:])
+        print(f'Episode {episode}: average score {round(avg_score)}, average highest tile {round(avg_top_tile)}')
 agent.save()
 
 
