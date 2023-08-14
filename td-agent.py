@@ -13,8 +13,9 @@ temp = [2**i for i in range(12)]
 log2 = {temp[i]: i for i in range(1,12)}
 log2[0] = 0
 
-MAX_VAL = 7
-OPTIMISTIC_INIT = 2**MAX_VAL  # something in the ball park of a solid score
+
+# OPTIMISTIC_INIT = 2**MAX_VAL  # something in the ball park of a solid score
+OPTIMISTIC_INIT = 0
 
 class NTuple:
     def __init__(self, coords, max_val, LUT=None, update_counts=None):
@@ -63,17 +64,17 @@ class NTuple:
 
 
 class NTupleNetwork:
-    def __init__(self, all_coords, max_val):
+    def __init__(self, all_coords, max_val, height=4, width=4, symmetries=True):
         self.tuples = [] 
-        self.init_tuples(all_coords, max_val)
+        self.init_tuples(all_coords, max_val, height, width, symmetries)
 
-    def init_tuples(self, all_coords, max_val):
+    def init_tuples(self, all_coords, max_val, height, width, symmetries):
         def reflect_horizontal(coords):
-            return [(Env2048.HEIGHT-1-y,x) for (y,x) in coords]
+            return [(height-1-y,x) for (y,x) in coords]
         
         def rotate_clockwise(coords):
             # e.g. (y,x)=(3,3) --> (3,0); (y,x)=(2,1) --> (1,1) 
-            return [(x,Env2048.WIDTH-1-y) for (y,x) in coords]
+            return [(x,width-1-y) for (y,x) in coords]
 
         
         for coords in all_coords:
@@ -84,15 +85,16 @@ class NTupleNetwork:
             LUT = original_n_tuple.LUT
             self.tuples.append(original_n_tuple)
 
-            copy_tuple = NTuple(reflected_rotated_coords, max_val, LUT=LUT)
-            self.tuples.append(copy_tuple)
+            if symmetries:
+                copy_tuple = NTuple(reflected_rotated_coords, max_val, LUT=LUT)
+                self.tuples.append(copy_tuple)
 
-            for _ in range(3):
-                rotated_coords = rotate_clockwise(rotated_coords)
-                reflected_rotated_coords = rotate_clockwise(reflected_rotated_coords)
+                for _ in range(3):
+                    rotated_coords = rotate_clockwise(rotated_coords)
+                    reflected_rotated_coords = rotate_clockwise(reflected_rotated_coords)
 
-                self.tuples.append(NTuple(rotated_coords, max_val,LUT=LUT))
-                self.tuples.append(NTuple(reflected_rotated_coords, max_val,LUT=LUT))
+                    self.tuples.append(NTuple(rotated_coords, max_val,LUT=LUT))
+                    self.tuples.append(NTuple(reflected_rotated_coords, max_val,LUT=LUT))
 
 
     def evaluate(self, board):
@@ -108,13 +110,18 @@ class NTupleNetwork:
 
 
 class TDAgent:
-    def __init__(self, all_coords, max_val, learning_rate, trace_decay):
-        NTN = NTupleNetwork(all_coords, max_val)
+    def __init__(self, all_coords, max_val, learning_rate, trace_decay, 
+                 width=4, height=4, symmetries=True):
+        self.width = width
+        self.height = height
+        NTN = NTupleNetwork(all_coords, max_val, 
+                            height=height, width=width,symmetries=symmetries)
         self.NTN = NTN
         self.m = len(NTN.tuples)
         self.max_val = max_val
 
         self.history = []  # reset after each episode
+        self.afterstates = []  # reset after each episode
 
         # TODO learning rate should appear somewhere
         self.learning_rate = learning_rate
@@ -137,21 +144,35 @@ class TDAgent:
         return v + reward, info['valid_move']
     
     def update(self, reward, lost, won):
-        if len(self.history) <= 1:
+        if len(self.afterstates) <= 1:
             return
-        afterstate1 = self.history[-1]
-        afterstate0 = self.history[-2]
+        
+
+        ###  OLD  ### 
+        afterstate1 = self.afterstates[-1]
+        afterstate0 = self.afterstates[-2]
         diff = reward + self.NTN.evaluate(afterstate1) - self.NTN.evaluate(afterstate0)
         if lost:
             diff -= self.NTN.evaluate(afterstate1)
         if won:
-            diff = 10*(MAX_VAL**2)  # arbitrarily picked
+            # diff = 10*(MAX_VAL**2)  # arbitrarily picked. doesn't work if 2**max_val isn't reachable
+            diff = 5*reward
+        ###  OLD  ###  
+
+        # if lost: 
+        #     pass
+        # elif won:
+        #     pass
+        # else: 
+        #    pass
+
+        # Could just initialize all won states to some good value
 
         for k in range(1,self.h+1):
-            t = len(self.history) - k
+            t = len(self.afterstates) - 1 - k
             if t < 0: 
                 return
-            afterstate = self.history[t]
+            afterstate = self.afterstates[t]
             # changed_coords = set([(i,j) for i in range(4) for j in range(4) 
             #               if afterstate[i][j] != afterstate1[i][j]])
             ## doesn't really make sense to only limit updating to changed coordinates now 
@@ -191,25 +212,31 @@ class TDAgent:
     def load(params, path):
         with open(path, 'rb') as file:
             NTN = pickle.load(file)
-        agent = TDAgent([], 1) # TODO fix the initialization. [],1 are temporary values that are only used to initialize the NTN, which is instantly overwritten by the one we load
+        agent = TDAgent([], 1)  # creates a temp NTN before the real one is loaded
         agent.NTN = NTN
         print(f'Agent loaded from {path}')
         return agent
     
     def learn_from_episode(self, save=False):
-        env = Env2048()
+        env = Env2048(width=self.width, height=self.height)
+        self.afterstates = [env.board]  # this is an empty board before spawning any tiles
         state = env.reset()
-        self.history = [state]  # list of afterstates
+        self.history = [state]  # list of states
         done = False
         t = 0
         
         while not done:
             move = self.move_greedy(state)
-            state, reward, lost, _ = env.step(move)
+            state, reward, lost, info = env.step(move)
             won = np.max(state) >= 2**self.max_val
+
+            self.afterstates.append(info['afterstate'])
+            self.history.append(state)
+
             self.update(reward, lost, won)
 
-            self.history.append(state)
+            
+            
             t += 1
 
             done = lost or won
@@ -225,53 +252,116 @@ class TDAgent:
         return env.score, np.max(state)
 
 
-# TODO copy what is in the original paper exactly
+
+
+# =========================================
+#   FUNCTIONS FOR TESTING AND STATISTICS
+# =========================================
+
+
+def moving_average(data, window_size):
+    window = np.ones(window_size) / window_size
+    return np.convolve(data, window, mode='valid')
+
+
+def generate_all_boards(w, h, vals):
+        
+    def _generate_all(prefix):
+        res = []
+        for val in vals:
+            a = [x for x in prefix]
+            a.append(val)
+            if len(a) == w * h:
+                res.append(a)
+            else:
+                res += _generate_all(a)
+        return res
+    
+    lists = _generate_all([])
+    return [np.array(l).reshape((h,w)) for l in lists]
+
+
+
+# =========================================
+#         AGENT INITIALIZATION
+# =========================================
+
+# all_locations = [\
+#     [[0,0,0,0],
+#     [0,0,0,0],
+#     [1,1,0,0],
+#     [1,1,1,1]],
+
+#     [[0,0,0,0],
+#     [1,1,0,0],
+#     [1,1,1,1],
+#     [0,0,0,0]],
+
+#     [[1,1,0,0], 
+#      [1,1,1,1],
+#      [0,0,0,0],
+#      [0,0,0,0]],
+
+#     [[0,1,1,1], 
+#      [0,1,1,1],
+#      [0,0,0,0],
+#      [0,0,0,0]],
+
+#     [[0,0,0,0], 
+#      [0,1,1,1],
+#      [0,1,1,1],
+#      [0,0,0,0]],
+
+#      [[0,0,0,0], 
+#      [0,0,0,0],
+#      [0,1,1,1],
+#      [0,1,1,1]]
+# ]
+
 all_locations = [\
-    [[0,0,0,0],
-    [0,0,0,0],
-    [1,1,0,0],
-    [1,1,1,1]],
-
-    [[0,0,0,0],
-    [1,1,0,0],
-    [1,1,1,1],
-    [0,0,0,0]],
-
-    [[1,1,0,0], 
-     [1,1,1,1],
-     [0,0,0,0],
-     [0,0,0,0]],
-
-    [[0,1,1,1], 
-     [0,1,1,1],
-     [0,0,0,0],
-     [0,0,0,0]],
-
-    [[0,0,0,0], 
-     [0,1,1,1],
-     [0,1,1,1],
-     [0,0,0,0]],
-
-     [[0,0,0,0], 
-     [0,0,0,0],
-     [0,1,1,1],
-     [0,1,1,1]]
+    [[0,0,0],
+    [1,1,1],
+    [1,1,1]]
 ]
+
+# all_locations = [\
+#     [[1,1,1],
+#     [1,1,1]]
+# ]
+
+# all_locations = [\
+#     [[1,1,1,1]]
+# ]
+
+
 all_locations = [np.array(a) for a in all_locations]
 all_coords = [np.argwhere(locations == 1) for locations in all_locations]
 all_coords = [[tuple(row) for row in coords] for coords in all_coords]
 
 
 # agent = TDAgent.load('agents/agent3.pkl')
+MAX_VAL = 8
+vals = [0]
+vals += [2**i for i in range(1, MAX_VAL + 1)]
 
+width = 3
+height = 3
 learning_rate = 0.05
 trace_decay = 0
-agent = TDAgent(all_coords, MAX_VAL, learning_rate, trace_decay)
+agent = TDAgent(all_coords, MAX_VAL, learning_rate, trace_decay, 
+                width=width, height=height, symmetries=True)
+
+
+
+# =========================================
+#         MAIN LOOP
+# =========================================
+
 
 episode = 0
 scores = []
 top_tiles = []
-update_freq = 20
+update_freq = 200
 while True:
     score, top_tile = agent.learn_from_episode()
     
@@ -283,7 +373,8 @@ while True:
         avg_score = np.mean(scores[episode-update_freq:])
         avg_top_tile = np.mean(top_tiles[episode-update_freq:])
         percentage_perfect = np.count_nonzero(np.array(top_tiles[episode-update_freq:]) == 2**MAX_VAL) / update_freq
-        print(f'Episode {episode}: average score {round(avg_score)}, average highest tile {round(avg_top_tile)}, fraction of perfect {percentage_perfect:.2f}')
+        # print(f'Episode {episode}: average score {round(avg_score)}, average highest tile {round(avg_top_tile)}, fraction of perfect {percentage_perfect:.2f}')
+        print(f'Episode {episode}: average score {round(avg_score)}, average highest tile {round(avg_top_tile)}')
 
         LUTs = [n_tuple.LUT for n_tuple in agent.NTN.tuples]  # contains duplicates but doesn't matter
 
@@ -291,22 +382,31 @@ while True:
         for LUT in LUTs:
             n_untouched += np.count_nonzero(LUT==OPTIMISTIC_INIT)
         frac_untouched = n_untouched / (len(LUTs) * len(LUTs[0]))
-        print(f'Fraction of LUT elements untouched: {frac_untouched:.5f}')
-        # print(f'Number of LUT elements untouched: {n_untouched}')
+        # print(f'Fraction of LUT elements untouched: {frac_untouched:.5f}')
+        
 
 agent.save()
 
 
-plt.plot(range(len(top_tiles)), top_tiles)
 
 
-def moving_average(data, window_size):
-    window = np.ones(window_size) / window_size
-    return np.convolve(data, window, mode='valid')
+# =========================================
+#               DEBUGGING
+# =========================================
 
-window_size = 50
 
-# Calculate the moving average
-moving_avg = moving_average(scores, window_size)
 
-plt.plot(moving_avg)
+window_size = 200
+plt.plot(moving_average(scores, window_size))
+# plt.plot(moving_average(top_tiles, window_size))
+
+
+
+w = 3
+h = 2
+
+ntuple = agent.NTN.tuples[0]
+
+for board in generate_all_boards(w,h,vals):
+    if ntuple.evaluate(board) > 0.1: 
+        print(f'{board}\t{ntuple.evaluate(board):.2f}\n')

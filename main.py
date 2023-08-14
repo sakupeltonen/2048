@@ -22,9 +22,9 @@ direction_from_pg = {
 
 
 
-def pg_main(initialize, handle_keypress):
+def pg_main(width, height, initialize, handle_keypress):
     pg.init()
-    screen = pg.display.set_mode((Env2048.WIDTH * constants["boxsize"], Env2048.HEIGHT * constants["boxsize"]))
+    screen = pg.display.set_mode((width * constants["boxsize"], height * constants["boxsize"]))
     pg.display.set_caption("2048")
     pg_running = True
     terminated = False
@@ -55,8 +55,8 @@ def pg_main(initialize, handle_keypress):
 
 
 
-def human_play(initial_state=None):
-    env = Env2048(render_mode='human')
+def human_play(width=4, height=4, initial_state=None):
+    env = Env2048(width=width, height=height, render_mode='human')
     _ = env.reset(custom_state=initial_state)
     # _ = env.reset(custom_state=[16,128,16,128,64,8,64,8,256,1024,256,1024,32,64,0,0])
 
@@ -83,7 +83,7 @@ def human_play(initial_state=None):
             if terminated:
                 print(f"Game over. Total score: {game_score}")
 
-    pg_main(initialize, handle_keypress)
+    pg_main(width, height, initialize, handle_keypress)
     save_game(history)
 
 
@@ -93,8 +93,11 @@ def replay_game(path):
         history = pickle.load(file)
 
     state_index = 0
-    env = Env2048(render_mode='human')
-    _ = env.reset(custom_state=history[state_index])
+    board = history[state_index]
+    width = len(board[0])
+    height = len(board)
+    env = Env2048(width=width, height=height, render_mode='human')
+    _ = env.reset(custom_state=board)
 
     def initialize(screen):
         env.screen = screen
@@ -113,8 +116,8 @@ def replay_game(path):
         env.board = history[state_index]
         env.render()
 
-    pg_main(initialize, handle_keypress)
+    pg_main(width, height, initialize, handle_keypress)
 
 
-human_play()
+human_play(width=3, height=2)
 # replay_game('games/128bad.pkl')

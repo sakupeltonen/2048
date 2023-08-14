@@ -13,10 +13,8 @@ theme = 'light'
 class Env2048(gym.Env):
     metadata = {"render_modes": ["ansi","human"]}
 
-    PROB_2 = 0.9
-    # TODO these should probably be global constants
-    WIDTH = 2
-    HEIGHT = 5
+    # PROB_2 = 0.9  
+    PROB_2 = 1  # TEMP
 
     action_to_int = {
         'down': 0,
@@ -25,10 +23,12 @@ class Env2048(gym.Env):
         'right': 3
     }
 
-    def __init__(self, render_mode='ansi', screen=None):
+    def __init__(self, width=4, height=4, render_mode='ansi', screen=None):
+        self.width = width
+        self.height = height
         self.observation_space = spaces.Box(low=0,
                                             high=2**16,
-                                            shape=(Env2048.HEIGHT, Env2048.WIDTH),
+                                            shape=(height, width),
                                             dtype=np.int32)
         self.action_space = spaces.Discrete(4)
 
@@ -37,7 +37,7 @@ class Env2048(gym.Env):
 
         self.screen = screen
 
-        self.board = np.zeros((Env2048.HEIGHT, Env2048.WIDTH), dtype=np.int32)
+        self.board = np.zeros((height, width), dtype=np.int32)
         self.score = 0
         
 
@@ -45,17 +45,17 @@ class Env2048(gym.Env):
         if empty: 
             return self.board
         if custom_state is None:
-            self.board = np.zeros((Env2048.HEIGHT, Env2048.WIDTH), dtype=np.int32)
+            self.board = np.zeros((self.height, self.width), dtype=np.int32)
             self.board = Env2048._place_random_tile(self.board)
             self.board = Env2048._place_random_tile(self.board)
         else:
             # custom_state possibly given as a one-dimensional list (in row-major order), or 
             # as a two-dimensional np.array
             if isinstance(custom_state, list):
-                assert len(custom_state) == Env2048.HEIGHT * Env2048.WIDTH
+                assert len(custom_state) == self.height * self.width
                 i = 0
-                for y in range(Env2048.HEIGHT):
-                    for x in range(Env2048.WIDTH):
+                for y in range(self.height):
+                    for x in range(self.width):
                         self.board[y][x] = custom_state[i]
                         i += 1
             else:
@@ -103,9 +103,11 @@ class Env2048(gym.Env):
             return False
         
         def exists_mergeable(board):
+            height = len(board)
+            width = len(board[0])
             # Tests if two vertically adjacent tiles can be combined on board
-            for col in range(Env2048.WIDTH):
-                for row in range(1,Env2048.HEIGHT):
+            for col in range(width):
+                for row in range(1,height):
                     if board[row-1][col] == board[row][col]:
                         return True
             return False
@@ -119,8 +121,8 @@ class Env2048(gym.Env):
             move = Env2048.action_to_int[move]
 
         board_rotated = np.rot90(board.copy(), k=move)  # note that the rotated board is a view of the original array (still linked)
-        flipped = (move == 1) or (move == 3)
-        board_updated, reward = Env2048._move_down(board_rotated, flipped)
+        
+        board_updated, reward = Env2048._move_down(board_rotated)
         afterstate = np.rot90(board_updated, k=4-move)
 
         # directions that don't slide/combine any tiles are not valid (but also don't give any points)
@@ -144,28 +146,9 @@ class Env2048(gym.Env):
         return board, reward, done, info
     
     @staticmethod
-    def _move_down(board, flipped):
-        """
-           Slide tiles of board down
-        
-           Parameters:
-           width (int): Width of board, possibly different from Env2048.WIDTH
-           height (int): Height of board, possibly different from Env2048.WIDTH
-        
-           Returns:
-           board, reward: Resulting board and the reward from combining tiles.
-        
-           Notes:
-           specifying width and height is necessary when a non-rectangular board is used: 
-           e.g. moving left involves first flipping the board
-        """
-        # TODO could just look at the dimensions of the given board
-        if not flipped: 
-            width = Env2048.WIDTH
-            height = Env2048.HEIGHT
-        else:
-            width = Env2048.HEIGHT
-            height = Env2048.WIDTH
+    def _move_down(board):
+        height = len(board)
+        width = len(board[0])
 
         reward = 0
         # Handle each column independently
@@ -199,8 +182,8 @@ class Env2048(gym.Env):
         return board, reward
 
     @classmethod
-    def random_state(cls, max_power=6, n_tiles=8,render_mode='ansi'):
-        env = Env2048(empty=True,render_mode=render_mode)
+    def random_state(cls, width=4, height=4, max_power=6, n_tiles=8,render_mode='ansi'):
+        env = Env2048(width=width, height=height, empty=True,render_mode=render_mode)
         
         all_coords = [(y,x) for y in range(env.height) for x in range(env.width)]  # get list of all coordinates
         random_subset_indices = np.random.choice(len(all_coords), n_tiles, replace=False)
@@ -226,8 +209,8 @@ class Env2048(gym.Env):
         self.screen.fill(tuple(constants["colour"][theme]["background"]))
         box_size = constants["boxsize"]
         padding = constants["padding"]
-        for i in range(Env2048.HEIGHT):
-            for j in range(Env2048.WIDTH):
+        for i in range(self.height):
+            for j in range(self.width):
                 colour = tuple(constants["colour"][theme][str(self.board[i][j])])
                 pygame.draw.rect(self.screen, colour, (j * box_size + padding,
                                                 i * box_size + padding,
