@@ -25,7 +25,6 @@ class NTuple:
            max_val (type): Maximum possible value in array
            - max_val^n is the size of the lookup table
            LUT, update_counts: pointers to arrays for other NTuples, when initialized as a symmetric copy
-           TODO have to be very careful when computing the coords for symmetric tuples
         """
         self.coords = coords
         n = len(coords)
@@ -70,11 +69,11 @@ class NTupleNetwork:
 
     def init_tuples(self, all_coords, max_val):
         def reflect_horizontal(coords):
-            return [(3-y,x) for (y,x) in coords]  # TODO remove hardcoded height 3
+            return [(Env2048.HEIGHT-1-y,x) for (y,x) in coords]
         
         def rotate_clockwise(coords):
             # e.g. (y,x)=(3,3) --> (3,0); (y,x)=(2,1) --> (1,1) 
-            return [(x,3-y) for (y,x) in coords] # TODO remove hardcoded width 3
+            return [(x,Env2048.WIDTH-1-y) for (y,x) in coords]
 
         
         for coords in all_coords:

@@ -14,8 +14,9 @@ class Env2048(gym.Env):
     metadata = {"render_modes": ["ansi","human"]}
 
     PROB_2 = 0.9
-    WIDTH = 4
-    HEIGHT = 4
+    # TODO these should probably be global constants
+    WIDTH = 2
+    HEIGHT = 5
 
     action_to_int = {
         'down': 0,
@@ -118,7 +119,8 @@ class Env2048(gym.Env):
             move = Env2048.action_to_int[move]
 
         board_rotated = np.rot90(board.copy(), k=move)  # note that the rotated board is a view of the original array (still linked)
-        board_updated, reward = Env2048._move_down(board_rotated)
+        flipped = (move == 1) or (move == 3)
+        board_updated, reward = Env2048._move_down(board_rotated, flipped)
         afterstate = np.rot90(board_updated, k=4-move)
 
         # directions that don't slide/combine any tiles are not valid (but also don't give any points)
@@ -142,14 +144,36 @@ class Env2048(gym.Env):
         return board, reward, done, info
     
     @staticmethod
-    def _move_down(board):
+    def _move_down(board, flipped):
+        """
+           Slide tiles of board down
+        
+           Parameters:
+           width (int): Width of board, possibly different from Env2048.WIDTH
+           height (int): Height of board, possibly different from Env2048.WIDTH
+        
+           Returns:
+           board, reward: Resulting board and the reward from combining tiles.
+        
+           Notes:
+           specifying width and height is necessary when a non-rectangular board is used: 
+           e.g. moving left involves first flipping the board
+        """
+        # TODO could just look at the dimensions of the given board
+        if not flipped: 
+            width = Env2048.WIDTH
+            height = Env2048.HEIGHT
+        else:
+            width = Env2048.HEIGHT
+            height = Env2048.WIDTH
+
         reward = 0
         # Handle each column independently
-        for col in range(Env2048.WIDTH):
-            target_row = Env2048.HEIGHT - 1
+        for col in range(width):
+            target_row = height - 1
 
             # moving row gets values height-2 to 0. Maintain that moving_row < target_row. 
-            for moving_row in reversed(range(Env2048.HEIGHT - 1)):
+            for moving_row in reversed(range(height - 1)):
                 # nothing to move
                 if board[moving_row][col] == 0:
                     continue
@@ -200,15 +224,15 @@ class Env2048(gym.Env):
         my_font = pygame.font.SysFont(constants["font"], constants["font_size"], bold=True)
         
         self.screen.fill(tuple(constants["colour"][theme]["background"]))
-        box = constants["size"] // 4
+        box_size = constants["boxsize"]
         padding = constants["padding"]
-        for i in range(4):
-            for j in range(4):
+        for i in range(Env2048.HEIGHT):
+            for j in range(Env2048.WIDTH):
                 colour = tuple(constants["colour"][theme][str(self.board[i][j])])
-                pygame.draw.rect(self.screen, colour, (j * box + padding,
-                                                i * box + padding,
-                                                box - 2 * padding,
-                                                box - 2 * padding), 0)
+                pygame.draw.rect(self.screen, colour, (j * box_size + padding,
+                                                i * box_size + padding,
+                                                box_size - 2 * padding,
+                                                box_size - 2 * padding), 0)
                 if self.board[i][j] != 0:
                     if self.board[i][j] in (2, 4):
                         text_colour = tuple(constants["colour"][theme]["dark"])
@@ -217,6 +241,5 @@ class Env2048(gym.Env):
                     # display the number at the centre of the tile
                     self.screen.blit(my_font.render("{:>4}".format(
                         self.board[i][j]), 1, text_colour),
-                        (j * box + 2.5 * padding, i * box + 7 * padding))
+                        (j * box_size + 2.5 * padding, i * box_size + 7 * padding))
         pygame.display.update()
-

@@ -24,7 +24,7 @@ direction_from_pg = {
 
 def pg_main(initialize, handle_keypress):
     pg.init()
-    screen = pg.display.set_mode((constants["size"], constants["size"]))
+    screen = pg.display.set_mode((Env2048.WIDTH * constants["boxsize"], Env2048.HEIGHT * constants["boxsize"]))
     pg.display.set_caption("2048")
     pg_running = True
     terminated = False
@@ -116,5 +116,5 @@ def replay_game(path):
     pg_main(initialize, handle_keypress)
 
 
-# human_play()
-replay_game('games/128bad.pkl')
+human_play()
+# replay_game('games/128bad.pkl')

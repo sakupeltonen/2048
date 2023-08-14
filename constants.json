@@ -1,5 +1,6 @@
 {
 	"size": 500,
+    "boxsize": 125,
 	"padding": 5,
 	
 	"font": "Verdana",
