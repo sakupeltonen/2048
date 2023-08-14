@@ -13,6 +13,9 @@ temp = [2**i for i in range(12)]
 log2 = {temp[i]: i for i in range(1,12)}
 log2[0] = 0
 
+MAX_VAL = 7
+OPTIMISTIC_INIT = 2**MAX_VAL  # something in the ball park of a solid score
+
 class NTuple:
     def __init__(self, coords, max_val, LUT=None, update_counts=None):
         """
@@ -28,23 +31,21 @@ class NTuple:
         n = len(coords)
         self.n = n
         self.max_val = max_val
-        size = max_val ** n
+        size = (max_val+1) ** n
         self.size = size
 
         if LUT is None:
-            self.LUT = np.zeros(size)
-            # TODO optimistic initialization to encourage exploration
+            self.LUT = np.zeros(size) + OPTIMISTIC_INIT  # TODO remove hardcoded optimistic initialization
         else:
             self.LUT = LUT
 
         if update_counts is None:
-            self.update_counts = np.zeros(size) + 25000
+            self.update_counts = np.zeros(size) 
         else:
             self.update_counts = update_counts
 
     def index(self, board):
         """ Get index i in LUT corresponding to the tuple given by board[self.coords] """
-        # TODO the board contains values in the original format whereas this uses the powers
         values = [board[i][j] for (i,j) in self.coords]
         values = [log2[v] for v in values]
         res = 0
@@ -61,34 +62,13 @@ class NTuple:
         self.LUT[i] += difference
         self.update_counts[i] += 1
 
-    def index_inverse(self, i):
-        """Inverse operation of index. Used for debugging"""
-        # TODO
-        _i =  i
-        values = [0 for _ in range(self.n)]
-        for i in reversed(range(self.n)):
-            # Find largest value at index i,
-            # such that values[i] * (self.max_val ** i) <= i
-            value = 0
-            while True:
-                if (value + 1) * (self.max_val ** i) <= _i:
-                    value += 1
-                else:
-                    break
-            values[i] = value
-            _i -= value * (self.max_val ** i)
-
-        check = self.index(values)
-        assert check == i, ""
-        return values
-
 
 class NTupleNetwork:
-    def __init__(self, all_coords, max_val, symmetries=[]):
+    def __init__(self, all_coords, max_val):
         self.tuples = [] 
-        self.init_tuples(all_coords, max_val, symmetries)
+        self.init_tuples(all_coords, max_val)
 
-    def init_tuples(self, all_coords, max_val, symmetries):
+    def init_tuples(self, all_coords, max_val):
         def reflect_horizontal(coords):
             return [(3-y,x) for (y,x) in coords]  # TODO remove hardcoded height 3
         
@@ -121,33 +101,29 @@ class NTupleNetwork:
         for n_tuple in self.tuples:
             res += n_tuple.evaluate(board)
         return res
-
-    def update_old(self, board, difference, changed_indices):
-        changed_tuples = [n_tuple for n_tuple in self.tuples 
-                          if len(changed_indices.intersection(set(n_tuple.coords))) > 0]
-
-        for n_tuple in changed_tuples:
-            n_tuple.update(board, difference / len(changed_tuples))
     
-    def update_old(self, board, difference):
+    def update(self, board, difference):
         for n_tuple in self.tuples:
             n_tuple.update(board, difference / len(self.tuples))
 
 
 
 class TDAgent:
-    def __init__(self, all_coords, max_val):
-        NTN = NTupleNetwork(all_coords, max_val, symmetries=['reflection','rotation'])
+    def __init__(self, all_coords, max_val, learning_rate, trace_decay):
+        NTN = NTupleNetwork(all_coords, max_val)
         self.NTN = NTN
         self.m = len(NTN.tuples)
+        self.max_val = max_val
 
         self.history = []  # reset after each episode
 
         # TODO learning rate should appear somewhere
-        self.learning_rate = 0.1
-        trace_decay = 0.60
+        self.learning_rate = learning_rate
         self.trace_decay = trace_decay  # TD(lambda)
-        self.h = int(math.log(0.1, trace_decay))  # cutoff index for updating history. earlier states have a weight of < trace_decay^h = 0.1
+        if trace_decay == 0:
+            self.h = 1
+        else:
+            self.h = int(math.log(0.1, trace_decay))  # cutoff index for updating history. earlier states have a weight of < trace_decay^h = 0.1
 
     def evaluate(self, state, move):
         """
@@ -161,27 +137,18 @@ class TDAgent:
         v = self.NTN.evaluate(afterstate)
         return v + reward, info['valid_move']
     
-    def update_old(self, afterstate0, afterstate1, reward, done=False):
-        # TODO also update earlier states, stored in some history for the episode
-        if not done:
-            diff = reward + self.NTN.evaluate(afterstate1) - self.NTN.evaluate(afterstate0)
-        else:
-            diff = reward - self.NTN.evaluate(afterstate0)
-        # TODO remove hardcoding of board width and height
-        changed_coords = set([(i,j) for i in range(4) for j in range(4) 
-                          if afterstate0[i][j] != afterstate1[i][j]])
-        self.NTN.update_old(afterstate0, self.learning_rate * diff, changed_coords)
-
-    def update(self, reward, done=False):
+    def update(self, reward, lost, won):
         if len(self.history) <= 1:
             return
         afterstate1 = self.history[-1]
         afterstate0 = self.history[-2]
         diff = reward + self.NTN.evaluate(afterstate1) - self.NTN.evaluate(afterstate0)
-        if done:
+        if lost:
             diff -= self.NTN.evaluate(afterstate1)
+        if won:
+            diff = 10*(MAX_VAL**2)  # arbitrarily picked
 
-        for k in range(1,self.h):
+        for k in range(1,self.h+1):
             t = len(self.history) - k
             if t < 0: 
                 return
@@ -189,7 +156,9 @@ class TDAgent:
             # changed_coords = set([(i,j) for i in range(4) for j in range(4) 
             #               if afterstate[i][j] != afterstate1[i][j]])
             ## doesn't really make sense to only limit updating to changed coordinates now 
-            self.NTN.update(afterstate, self.learning_rate * diff * (self.trace_decay**k))
+
+            decay = 1 if self.trace_decay == 0 else (self.trace_decay**k)
+            self.NTN.update(afterstate, self.learning_rate * diff * decay)
 
 
     # TODO some exploration?
@@ -231,33 +200,30 @@ class TDAgent:
     def learn_from_episode(self, save=False):
         env = Env2048()
         state = env.reset()
-        history = [state]  # list of afterstates
+        self.history = [state]  # list of afterstates
         done = False
         t = 0
-        afterstate0 = None
-        afterstate1 = None
+        
         while not done:
             move = self.move_greedy(state)
-            state, reward, done, info = env.step(move)
-            afterstate1 = info['afterstate']
+            state, reward, lost, _ = env.step(move)
+            won = np.max(state) >= 2**self.max_val
+            self.update(reward, lost, won)
 
-            self.update(reward)
-
-            history.append(state)
-            afterstate0 = afterstate1
+            self.history.append(state)
             t += 1
+
+            done = lost or won
         
-        self.update(reward, done=True)
-        # TODO add ending condition for reaching 2024
 
         if save:
-            save_game(history, base_name='td')
+            save_game(self.history, base_name='td')
         
         # TEMP
         # if env.score > 3000:
         #     save_game(history, base_name='td')
 
-        return env.score, np.max(afterstate1)
+        return env.score, np.max(state)
 
 
 # TODO copy what is in the original paper exactly
@@ -298,12 +264,15 @@ all_coords = [[tuple(row) for row in coords] for coords in all_coords]
 
 
 # agent = TDAgent.load('agents/agent3.pkl')
-agent = TDAgent(all_coords, 11)
+
+learning_rate = 0.05
+trace_decay = 0
+agent = TDAgent(all_coords, MAX_VAL, learning_rate, trace_decay)
 
 episode = 0
 scores = []
 top_tiles = []
-update_freq = 100
+update_freq = 20
 while True:
     score, top_tile = agent.learn_from_episode()
     
@@ -314,9 +283,31 @@ while True:
     if episode % update_freq == 0:
         avg_score = np.mean(scores[episode-update_freq:])
         avg_top_tile = np.mean(top_tiles[episode-update_freq:])
-        print(f'Episode {episode}: average score {round(avg_score)}, average highest tile {round(avg_top_tile)}')
+        percentage_perfect = np.count_nonzero(np.array(top_tiles[episode-update_freq:]) == 2**MAX_VAL) / update_freq
+        print(f'Episode {episode}: average score {round(avg_score)}, average highest tile {round(avg_top_tile)}, fraction of perfect {percentage_perfect:.2f}')
+
+        LUTs = [n_tuple.LUT for n_tuple in agent.NTN.tuples]  # contains duplicates but doesn't matter
+
+        n_untouched = 0
+        for LUT in LUTs:
+            n_untouched += np.count_nonzero(LUT==OPTIMISTIC_INIT)
+        frac_untouched = n_untouched / (len(LUTs) * len(LUTs[0]))
+        print(f'Fraction of LUT elements untouched: {frac_untouched:.5f}')
+        # print(f'Number of LUT elements untouched: {n_untouched}')
+
 agent.save()
 
 
+plt.plot(range(len(top_tiles)), top_tiles)
 
 
+def moving_average(data, window_size):
+    window = np.ones(window_size) / window_size
+    return np.convolve(data, window, mode='valid')
+
+window_size = 50
+
+# Calculate the moving average
+moving_avg = moving_average(scores, window_size)
+
+plt.plot(moving_avg)
