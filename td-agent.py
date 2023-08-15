@@ -4,6 +4,7 @@ import pickle
 import matplotlib.pyplot as plt
 import os
 import math
+import time
 from environment import Env2048
 from tools import save_game
 
@@ -18,14 +19,14 @@ log2[0] = 0
 OPTIMISTIC_INIT = 0
 
 class NTuple:
-    def __init__(self, coords, max_val, LUT=None, update_counts=None):
+    def __init__(self, coords, max_val, LUT=None, E=None, A=None):
         """
            Parameters:
            coords ([int]): list of board coordinates (order is important)
            - n=len(indices) as in NTuple
            max_val (type): Maximum possible value in array
            - max_val^n is the size of the lookup table
-           LUT, update_counts: pointers to arrays for other NTuples, when initialized as a symmetric copy
+           LUT, E, A: pointers to arrays for other NTuples, when initialized as a symmetric copy
         """
         self.coords = coords
         n = len(coords)
@@ -36,13 +37,13 @@ class NTuple:
 
         if LUT is None:
             self.LUT = np.zeros(size) + OPTIMISTIC_INIT  # TODO remove hardcoded optimistic initialization
+            self.E = np.zeros(size)
+            self.A = np.zeros(size)
         else:
             self.LUT = LUT
+            self.E = E
+            self.A = A
 
-        if update_counts is None:
-            self.update_counts = np.zeros(size) 
-        else:
-            self.update_counts = update_counts
 
     def index(self, board):
         """ Get index i in LUT corresponding to the tuple given by board[self.coords] """
@@ -57,10 +58,17 @@ class NTuple:
         """ NTuple(board) returns the value of the NTuple for the given tuple at board[self.coords] """
         return self.LUT[self.index(board)]
 
-    def update(self, board, difference):
+    def update(self, board, difference, diff_lambda):
+        # TODO rename difference, diff_lambda to sth more informative
         i = self.index(board)
-        self.LUT[i] += difference
-        self.update_counts[i] += 1
+        if self.A[i] != 0:
+            learning_rate = abs(self.E[i]) / self.A[i]
+        else:
+            learning_rate = 1
+
+        self.LUT[i] += learning_rate * difference
+        self.E[i] += diff_lambda
+        self.A[i] += abs(diff_lambda)
 
 
 class NTupleNetwork:
@@ -83,18 +91,20 @@ class NTupleNetwork:
 
             original_n_tuple = NTuple(rotated_coords, max_val)
             LUT = original_n_tuple.LUT
+            E = original_n_tuple.E
+            A = original_n_tuple.A
             self.tuples.append(original_n_tuple)
 
             if symmetries:
-                copy_tuple = NTuple(reflected_rotated_coords, max_val, LUT=LUT)
+                copy_tuple = NTuple(reflected_rotated_coords, max_val, LUT=LUT, E=E, A=A)
                 self.tuples.append(copy_tuple)
 
                 for _ in range(3):
                     rotated_coords = rotate_clockwise(rotated_coords)
                     reflected_rotated_coords = rotate_clockwise(reflected_rotated_coords)
 
-                    self.tuples.append(NTuple(rotated_coords, max_val,LUT=LUT))
-                    self.tuples.append(NTuple(reflected_rotated_coords, max_val,LUT=LUT))
+                    self.tuples.append(NTuple(rotated_coords, max_val,LUT=LUT, E=E, A=A))
+                    self.tuples.append(NTuple(reflected_rotated_coords, max_val,LUT=LUT, E=E, A=A))
 
 
     def evaluate(self, board):
@@ -103,14 +113,14 @@ class NTupleNetwork:
             res += n_tuple.evaluate(board)
         return res
     
-    def update(self, board, difference):
+    def update(self, board, difference, diff_lambda):
         for n_tuple in self.tuples:
-            n_tuple.update(board, difference / len(self.tuples))
+            n_tuple.update(board, difference / len(self.tuples), diff_lambda)
 
 
 
 class TDAgent:
-    def __init__(self, all_coords, max_val, learning_rate, trace_decay, 
+    def __init__(self, all_coords, max_val, meta_learning_rate, trace_decay, 
                  width=4, height=4, symmetries=True):
         self.width = width
         self.height = height
@@ -124,7 +134,7 @@ class TDAgent:
         self.afterstates = []  # reset after each episode
 
         # TODO learning rate should appear somewhere
-        self.learning_rate = learning_rate
+        self.meta_learning_rate = meta_learning_rate
         self.trace_decay = trace_decay  # TD(lambda)
         if trace_decay == 0:
             self.h = 1
@@ -178,7 +188,7 @@ class TDAgent:
             ## doesn't really make sense to only limit updating to changed coordinates now 
 
             decay = 1 if self.trace_decay == 0 else (self.trace_decay**k)
-            self.NTN.update(afterstate, self.learning_rate * diff * decay)
+            self.NTN.update(afterstate, self.meta_learning_rate * diff * decay, diff)
 
 
     # TODO some exploration?
@@ -286,43 +296,38 @@ def generate_all_boards(w, h, vals):
 #         AGENT INITIALIZATION
 # =========================================
 
-# all_locations = [\
-#     [[0,0,0,0],
-#     [0,0,0,0],
-#     [1,1,0,0],
-#     [1,1,1,1]],
-
-#     [[0,0,0,0],
-#     [1,1,0,0],
-#     [1,1,1,1],
-#     [0,0,0,0]],
-
-#     [[1,1,0,0], 
-#      [1,1,1,1],
-#      [0,0,0,0],
-#      [0,0,0,0]],
-
-#     [[0,1,1,1], 
-#      [0,1,1,1],
-#      [0,0,0,0],
-#      [0,0,0,0]],
-
-#     [[0,0,0,0], 
-#      [0,1,1,1],
-#      [0,1,1,1],
-#      [0,0,0,0]],
-
-#      [[0,0,0,0], 
-#      [0,0,0,0],
-#      [0,1,1,1],
-#      [0,1,1,1]]
-# ]
-
 all_locations = [\
-    [[0,0,0],
-    [1,1,1],
-    [1,1,1]]
+    [[0,0,0,0],
+    [0,0,0,0],
+    [1,1,0,0],
+    [1,1,1,1]],
+
+    [[0,0,0,0],
+    [1,1,0,0],
+    [1,1,1,1],
+    [0,0,0,0]],
+
+    [[1,1,0,0], 
+     [1,1,1,1],
+     [0,0,0,0],
+     [0,0,0,0]],
+
+    [[0,1,1,1], 
+     [0,1,1,1],
+     [0,0,0,0],
+     [0,0,0,0]],
+
+    [[0,0,0,0], 
+     [0,1,1,1],
+     [0,1,1,1],
+     [0,0,0,0]]
 ]
+
+# all_locations = [\
+#     [[0,0,0],
+#     [1,1,1],
+#     [1,1,1]]
+# ]
 
 # all_locations = [\
 #     [[1,1,1],
@@ -340,16 +345,18 @@ all_coords = [[tuple(row) for row in coords] for coords in all_coords]
 
 
 # agent = TDAgent.load('agents/agent3.pkl')
-MAX_VAL = 8
+MAX_VAL = 11
 vals = [0]
 vals += [2**i for i in range(1, MAX_VAL + 1)]
 
-width = 3
-height = 3
-learning_rate = 0.05
-trace_decay = 0
-agent = TDAgent(all_coords, MAX_VAL, learning_rate, trace_decay, 
+width = 4
+height = 4
+meta_learning_rate = 1
+trace_decay = 0.9
+agent = TDAgent(all_coords, MAX_VAL, meta_learning_rate, trace_decay, 
                 width=width, height=height, symmetries=True)
+
+# NOTE that symmetries=False required for non-rectangular boards
 
 
 
@@ -361,7 +368,9 @@ agent = TDAgent(all_coords, MAX_VAL, learning_rate, trace_decay,
 episode = 0
 scores = []
 top_tiles = []
-update_freq = 200
+update_freq = 100
+save_freq = 100
+start_time = time.time()
 while True:
     score, top_tile = agent.learn_from_episode()
     
@@ -372,17 +381,23 @@ while True:
     if episode % update_freq == 0:
         avg_score = np.mean(scores[episode-update_freq:])
         avg_top_tile = np.mean(top_tiles[episode-update_freq:])
-        percentage_perfect = np.count_nonzero(np.array(top_tiles[episode-update_freq:]) == 2**MAX_VAL) / update_freq
+        end_time = time.time()
+
+        # percentage_perfect = np.count_nonzero(np.array(top_tiles[episode-update_freq:]) == 2**MAX_VAL) / update_freq
         # print(f'Episode {episode}: average score {round(avg_score)}, average highest tile {round(avg_top_tile)}, fraction of perfect {percentage_perfect:.2f}')
-        print(f'Episode {episode}: average score {round(avg_score)}, average highest tile {round(avg_top_tile)}')
+        seconds_per_game = (end_time-start_time) / update_freq
+        print(f'Episode {episode}: avg score {round(avg_score)}, avg top tile {round(avg_top_tile)}, avg time {round(seconds_per_game)}')
+        start_time = time.time()
 
-        LUTs = [n_tuple.LUT for n_tuple in agent.NTN.tuples]  # contains duplicates but doesn't matter
-
-        n_untouched = 0
-        for LUT in LUTs:
-            n_untouched += np.count_nonzero(LUT==OPTIMISTIC_INIT)
-        frac_untouched = n_untouched / (len(LUTs) * len(LUTs[0]))
+        # LUTs = [n_tuple.LUT for n_tuple in agent.NTN.tuples]  # contains duplicates but doesn't matter
+        # n_untouched = 0
+        # for LUT in LUTs:
+        #     n_untouched += np.count_nonzero(LUT==OPTIMISTIC_INIT)
+        # frac_untouched = n_untouched / (len(LUTs) * len(LUTs[0]))
         # print(f'Fraction of LUT elements untouched: {frac_untouched:.5f}')
+    
+    if episode % save_freq == 0:
+        agent.save(name='senpai')
         
 
 agent.save()
@@ -396,17 +411,15 @@ agent.save()
 
 
 
-window_size = 200
+window_size = 100
 plt.plot(moving_average(scores, window_size))
-# plt.plot(moving_average(top_tiles, window_size))
+plt.plot(moving_average(top_tiles, window_size))
 
 
 
-w = 3
-h = 2
 
 ntuple = agent.NTN.tuples[0]
 
-for board in generate_all_boards(w,h,vals):
+for board in generate_all_boards(width,height,vals):
     if ntuple.evaluate(board) > 0.1: 
         print(f'{board}\t{ntuple.evaluate(board):.2f}\n')

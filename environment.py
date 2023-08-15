@@ -13,8 +13,8 @@ theme = 'light'
 class Env2048(gym.Env):
     metadata = {"render_modes": ["ansi","human"]}
 
-    # PROB_2 = 0.9  
-    PROB_2 = 1  # TEMP
+    PROB_2 = 0.9  
+    # PROB_2 = 1  # TEMP
 
     action_to_int = {
         'down': 0,
