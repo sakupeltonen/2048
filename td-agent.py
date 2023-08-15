@@ -155,7 +155,7 @@ class TDAgent:
         # reset after each episode
         self.history = []  
         self.afterstates = [] 
-        self.rewards = []
+        self.diffs = []
 
         trace_decay = specs['trace_decay']  # TD(lambda)
         self.trace_decay = trace_decay
@@ -181,10 +181,6 @@ class TDAgent:
         return v + reward, info['valid_move']
     
     def update(self, reward, lost, won):
-        # TODO would be much cleaner to just store all the rewards, since we store the boards in history as well
-        # if len(self.afterstates) <= 1:
-        #     return
-        
         afterstate1 = self.afterstates[-1]
         afterstate0 = self.afterstates[-2]
         
@@ -194,37 +190,34 @@ class TDAgent:
             diff = 5*reward  # HARDCODED. TODO move multiplier(?) to specs
         else:
             diff = reward + self.NTN.evaluate(afterstate1) - self.NTN.evaluate(afterstate0)
+        self.diffs.append(diff)
 
         t = len(self.history)-1
 
         if t > self.h:
-            # pop last diff and remove its effect from the sum
-            delta_last = self.queue.popleft()  # delta_{t-h-1}
+            delta_last = self.diffs[t-self.h]
             self.diff_sum -= delta_last * (self.trace_decay ** (self.h))
 
         self.diff_sum *= self.trace_decay
         self.diff_sum += diff
-        self.queue.append(diff)
 
         if not (lost or won):
-            # queue maintains delta_t for h+1 last differences
-            # TODO make sure this works in the case h=1
             if t >= self.h:
                 # update state s'_{t-h} with the sum
                 afterstate = self.afterstates[t-self.h]
                 self.NTN.update(afterstate, self.diff_sum)
 
-        # handle end of the game separately
         else:
+            # handle end of the game separately
             for k in reversed(range(1,self.h+1)):
                 if t-k < 0: 
                     continue
                 afterstate = self.afterstates[t-k]
                 self.NTN.update(afterstate, self.diff_sum)
 
-                delta_last = self.queue.popleft()  # delta_{t-k}
+                delta_last = self.diffs[t-k]
                 self.diff_sum -= delta_last * (self.trace_decay ** k)  
-                # TODO exponent might be off by one here
+                
 
 
     # TODO some exploration?
@@ -269,7 +262,8 @@ class TDAgent:
         self.afterstates = [env.board]  # this is an empty board before spawning any tiles
         state = env.reset()
         self.history = [state]  # list of states
-        self.rewards = []  # NOTE DIFFERENT INDEXING...
+        self.diffs = [0]  # the 0 maintains consistent indexing with history, afterstates. doesn't correspond to any move
+        self.diff_sum = 0
         done = False
         
         while not done:
@@ -318,7 +312,8 @@ def generate_all_boards(w, h, vals):
 #         AGENT INITIALIZATION
 # =========================================
 
-AGENT_NAME = '3x3'
+AGENT_NAME = '4x4'
+SAVING_ON = False
 specs_path = 'specs/' + AGENT_NAME + '.json'
 agent_specs = json.load(open(specs_path, "r"))
 agent = TDAgent(agent_specs)
@@ -370,7 +365,7 @@ while True:
         # frac_untouched = n_untouched / (len(LUTs) * len(LUTs[0]))
         # print(f'Fraction of LUT elements untouched: {frac_untouched:.5f}')
     
-    if episode % save_freq == 0:
+    if episode % save_freq == 0 and SAVING_ON:
         agent.save(name=agent_specs['name'], verbose=False)
         
 
@@ -381,7 +376,7 @@ while True:
 
 
 
-window_size = 500
+window_size = 100
 plt.plot(moving_average(scores, window_size))
 plt.plot(moving_average(top_tiles, window_size))
 
