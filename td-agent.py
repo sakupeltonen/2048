@@ -68,6 +68,7 @@ class NTuple:
         self.LUT[i] += learning_rate * difference
         self.E[i] += diff_lambda
         self.A[i] += abs(diff_lambda)
+        
 
 
 class NTupleNetwork:
@@ -156,7 +157,8 @@ class TDAgent:
         if trace_decay == 0:
             self.h = 1
         else:
-            self.h = int(math.log(0.1, trace_decay))  # cutoff index for updating history. earlier states have a weight of < trace_decay^h = 0.1
+            self.h = int(math.log(specs['cut_off_weight'], trace_decay))  # cutoff index for updating history. earlier states have a weight of < trace_decay^h = 0.1
+            
 
     def evaluate(self, state, move):
         """
@@ -174,26 +176,13 @@ class TDAgent:
         if len(self.afterstates) <= 1:
             return
         
-
-        ###  OLD  ### 
         afterstate1 = self.afterstates[-1]
         afterstate0 = self.afterstates[-2]
         diff = reward + self.NTN.evaluate(afterstate1) - self.NTN.evaluate(afterstate0)
         if lost:
             diff -= self.NTN.evaluate(afterstate1)
         if won:
-            # diff = 10*(MAX_VAL**2)  # arbitrarily picked. doesn't work if 2**max_val isn't reachable
-            diff = 5*reward
-        ###  OLD  ###  
-
-        # if lost: 
-        #     pass
-        # elif won:
-        #     pass
-        # else: 
-        #    pass
-
-        # Could just initialize all won states to some good value
+            diff = 5*reward  # HARDCODED. TODO move multiplier(?) to specs
 
         for k in range(1,self.h+1):
             t = len(self.afterstates) - 1 - k
@@ -219,7 +208,6 @@ class TDAgent:
         return move
     
     def save(self, folder_path='agents/', name=None, verbose=True):
-        # TODO this will produce an unintuitive order for the agents when one deletes agent1 and keeps agent2
         base_filename = 'agent'
         extension = '.pkl'
         if name:
@@ -237,15 +225,17 @@ class TDAgent:
             print(f'Agent saved in {path}')
     
     @classmethod
-    def load(params, path):
+    def load(specs):
+        path = 'agents/' + specs['name'] + '.pkl'
         with open(path, 'rb') as file:
             NTN = pickle.load(file)
-        agent = TDAgent([], 1)  # creates a temp NTN before the real one is loaded
+        agent = TDAgent(specs)  # creates a temp NTN before the real one is loaded
+        # TODO should also load and save the E and A
         agent.NTN = NTN
         print(f'Agent loaded from {path}')
         return agent
     
-    def learn_from_episode(self, save=False):
+    def learn_from_episode(self):
         env = Env2048(width=self.width, height=self.height)
         self.afterstates = [env.board]  # this is an empty board before spawning any tiles
         state = env.reset()
@@ -262,18 +252,10 @@ class TDAgent:
             self.history.append(state)
 
             self.update(reward, lost, won)
-
-            
             
             t += 1
-
             done = lost or won
-        
 
-        if save:
-            save_game(self.history, base_name='td')
-        
-        # TEMP
         # if env.score > 3000:
         #     save_game(history, base_name='td')
 
@@ -314,10 +296,13 @@ def generate_all_boards(w, h, vals):
 #         AGENT INITIALIZATION
 # =========================================
 
-agent_specs = json.load(open("agents/4x4symmetry.json", "r"))
+AGENT_NAME = '3x3'
+specs_path = 'specs/' + AGENT_NAME + '.json'
+agent_specs = json.load(open(specs_path, "r"))
 agent = TDAgent(agent_specs)
-# agent = TDAgent.load('agents/agent3.pkl')
-# TODO if saved file exists in location and load it if so
+
+# agent_specs = json.load(open("specs/2x3.json", "r"))
+# agent = TDAgent.load(agent_specs)
 
 
 
@@ -325,11 +310,7 @@ max_tile = agent_specs['max_tile']
 max_val = log2[max_tile]
 width = agent_specs['width']
 height = agent_specs['height']
-update_freq = agent_specs['update_freq']
-save_freq = agent_specs['save_freq']
 
-vals = [0]
-vals += [2**i for i in range(1, max_val + 1)]
 
 # =========================================
 #         MAIN LOOP
@@ -339,6 +320,8 @@ vals += [2**i for i in range(1, max_val + 1)]
 episode = 0
 scores = []
 top_tiles = []
+update_freq = agent_specs['update_freq']
+save_freq = agent_specs['save_freq']
 start_time = time.time()
 while True:
     score, top_tile = agent.learn_from_episode()
@@ -382,6 +365,8 @@ plt.plot(moving_average(top_tiles, window_size))
 
 
 
+vals = [0]
+vals += [2**i for i in range(1, max_val + 1)]
 
 ntuple = agent.NTN.tuples[0]
 

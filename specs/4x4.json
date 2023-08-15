@@ -1,5 +1,5 @@
 {
-	"name": "4x4symmetry",
+	"name": "4x4",
 
     "width": 4,
     "height": 4,
@@ -8,9 +8,10 @@
 	
 	"meta_learning_rate": 1,
 	"trace_decay": 0.9,
+    "cut_off_weight": 0.1,
     "optimistic_init": 0,
 
-    "update_freq": 1,
+    "update_freq": 20,
     "save_freq": 100,
 
     "symmetries": true,

@@ -1,5 +1,5 @@
 {
-	"name": "kek",
+	"name": "2x3",
 
     "width": 3,
     "height": 2,
@@ -8,6 +8,7 @@
 	
 	"meta_learning_rate": 1,
 	"trace_decay": 0.9,
+    "cut_off_weight": 0.1,
     "optimistic_init": 0,
 
     "update_freq": 200,

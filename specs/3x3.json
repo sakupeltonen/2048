@@ -1,0 +1,23 @@
+{
+	"name": "3x3",
+
+    "width": 3,
+    "height": 3,
+    "prob_2": 0.9,
+    "max_tile": 256,
+	
+	"meta_learning_rate": 1,
+	"trace_decay": 0.9,
+    "cut_off_weight": 0.1,
+    "optimistic_init": 0,
+
+    "update_freq": 100,
+    "save_freq": 200,
+
+    "symmetries": true,
+    "layout": [
+        [[0,0,0],
+        [1,1,1],
+        [1,1,1]]
+    ]
+}
