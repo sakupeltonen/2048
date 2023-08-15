@@ -11,8 +11,8 @@
     "cut_off_weight": 0.1,
     "optimistic_init": 0,
 
-    "update_freq": 20,
-    "save_freq": 100,
+    "update_freq": 5,
+    "save_freq": 20,
 
     "symmetries": true,
     "layout": [

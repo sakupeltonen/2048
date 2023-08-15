@@ -7,7 +7,7 @@
     "max_tile": 128,
 	
 	"meta_learning_rate": 1,
-	"trace_decay": 0.9,
+	"trace_decay": 0,
     "cut_off_weight": 0.1,
     "optimistic_init": 0,
 

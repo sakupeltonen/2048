@@ -6,6 +6,7 @@ import os
 import math
 import time
 import json
+from collections import deque
 from environment import Env2048
 from tools import save_game
 
@@ -125,9 +126,10 @@ class NTupleNetwork:
             res += n_tuple.evaluate(board)
         return res
     
-    def update(self, board, difference, diff_lambda):
+    def update(self, board, diff):
+        beta = self.specs['meta_learning_rate']
         for n_tuple in self.tuples:
-            n_tuple.update(board, difference / len(self.tuples), diff_lambda)
+            n_tuple.update(board, (beta/len(self.tuples)) * diff, diff)
 
     @staticmethod
     def tuple_coords_from_layout(layout):
@@ -140,6 +142,8 @@ class NTupleNetwork:
 
 class TDAgent:
     def __init__(self, specs):
+        self.specs = specs
+
         self.width = specs['width']
         self.height = specs['height']
         self.max_val = log2[specs['max_tile']]
@@ -148,16 +152,20 @@ class TDAgent:
         self.NTN = NTN
         self.m = len(NTN.tuples)
 
-        self.history = []  # reset after each episode
-        self.afterstates = []  # reset after each episode
+        # reset after each episode
+        self.history = []  
+        self.afterstates = [] 
+        self.rewards = []
 
-        self.meta_learning_rate = specs['meta_learning_rate']
         trace_decay = specs['trace_decay']  # TD(lambda)
         self.trace_decay = trace_decay
         if trace_decay == 0:
             self.h = 1
         else:
             self.h = int(math.log(specs['cut_off_weight'], trace_decay))  # cutoff index for updating history. earlier states have a weight of < trace_decay^h = 0.1
+
+        self.queue = deque()
+        self.diff_sum = 0
             
 
     def evaluate(self, state, move):
@@ -173,28 +181,50 @@ class TDAgent:
         return v + reward, info['valid_move']
     
     def update(self, reward, lost, won):
-        if len(self.afterstates) <= 1:
-            return
+        # TODO would be much cleaner to just store all the rewards, since we store the boards in history as well
+        # if len(self.afterstates) <= 1:
+        #     return
         
         afterstate1 = self.afterstates[-1]
         afterstate0 = self.afterstates[-2]
-        diff = reward + self.NTN.evaluate(afterstate1) - self.NTN.evaluate(afterstate0)
+        
         if lost:
-            diff -= self.NTN.evaluate(afterstate1)
-        if won:
+            diff = reward - self.NTN.evaluate(afterstate1)
+        elif won:
             diff = 5*reward  # HARDCODED. TODO move multiplier(?) to specs
+        else:
+            diff = reward + self.NTN.evaluate(afterstate1) - self.NTN.evaluate(afterstate0)
 
-        for k in range(1,self.h+1):
-            t = len(self.afterstates) - 1 - k
-            if t < 0: 
-                return
-            afterstate = self.afterstates[t]
-            # changed_coords = set([(i,j) for i in range(4) for j in range(4) 
-            #               if afterstate[i][j] != afterstate1[i][j]])
-            ## doesn't really make sense to only limit updating to changed coordinates now 
+        t = len(self.history)-1
 
-            decay = 1 if self.trace_decay == 0 else (self.trace_decay**k)
-            self.NTN.update(afterstate, self.meta_learning_rate * diff * decay, diff)
+        if t > self.h:
+            # pop last diff and remove its effect from the sum
+            delta_last = self.queue.popleft()  # delta_{t-h-1}
+            self.diff_sum -= delta_last * (self.trace_decay ** (self.h))
+
+        self.diff_sum *= self.trace_decay
+        self.diff_sum += diff
+        self.queue.append(diff)
+
+        if not (lost or won):
+            # queue maintains delta_t for h+1 last differences
+            # TODO make sure this works in the case h=1
+            if t >= self.h:
+                # update state s'_{t-h} with the sum
+                afterstate = self.afterstates[t-self.h]
+                self.NTN.update(afterstate, self.diff_sum)
+
+        # handle end of the game separately
+        else:
+            for k in reversed(range(1,self.h+1)):
+                if t-k < 0: 
+                    continue
+                afterstate = self.afterstates[t-k]
+                self.NTN.update(afterstate, self.diff_sum)
+
+                delta_last = self.queue.popleft()  # delta_{t-k}
+                self.diff_sum -= delta_last * (self.trace_decay ** k)  
+                # TODO exponent might be off by one here
 
 
     # TODO some exploration?
@@ -229,8 +259,7 @@ class TDAgent:
         path = 'agents/' + specs['name'] + '.pkl'
         with open(path, 'rb') as file:
             NTN = pickle.load(file)
-        agent = TDAgent(specs)  # creates a temp NTN before the real one is loaded
-        # TODO should also load and save the E and A
+        agent = TDAgent(specs)  # creates a temp NTN, E, A before the real ones are loaded
         agent.NTN = NTN
         print(f'Agent loaded from {path}')
         return agent
@@ -240,28 +269,21 @@ class TDAgent:
         self.afterstates = [env.board]  # this is an empty board before spawning any tiles
         state = env.reset()
         self.history = [state]  # list of states
+        self.rewards = []  # NOTE DIFFERENT INDEXING...
         done = False
-        t = 0
         
         while not done:
             move = self.move_greedy(state)
             state, reward, lost, info = env.step(move)
             won = np.max(state) >= 2**self.max_val
+            done = lost or won
 
             self.afterstates.append(info['afterstate'])
             self.history.append(state)
 
             self.update(reward, lost, won)
-            
-            t += 1
-            done = lost or won
-
-        # if env.score > 3000:
-        #     save_game(history, base_name='td')
 
         return env.score, np.max(state)
-    
-
 
 
 # =========================================
@@ -359,7 +381,7 @@ while True:
 
 
 
-window_size = 100
+window_size = 500
 plt.plot(moving_average(scores, window_size))
 plt.plot(moving_average(top_tiles, window_size))
 

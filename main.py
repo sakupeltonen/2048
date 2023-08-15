@@ -14,7 +14,7 @@ np.random.seed(42)
 constants = json.load(open("constants.json", "r"))
 
 direction_from_pg = {
-    pg.K_LEFT: 'left',
+    pg.K_LEFT: 'left', 
     pg.K_RIGHT: 'right',
     pg.K_UP: 'up',
     pg.K_DOWN: 'down'
