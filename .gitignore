@@ -3,3 +3,5 @@ __pycache__/
 greedy.py
 agents/
 games/
+**/.DS_Store
+games/

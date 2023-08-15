@@ -1,0 +1,21 @@
+{
+	"name": "kek",
+
+    "width": 3,
+    "height": 2,
+    "prob_2": 1,
+    "max_tile": 128,
+	
+	"meta_learning_rate": 1,
+	"trace_decay": 0.9,
+    "optimistic_init": 0,
+
+    "update_freq": 200,
+    "save_freq": 1000,
+
+    "symmetries": false,
+    "layout": [
+        [[1,1,1],
+        [1,1,1]]
+    ]
+}
