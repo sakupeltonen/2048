@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import os
 import math
 import time
+import json
 from environment import Env2048
 from tools import save_game
 
@@ -15,11 +16,9 @@ log2 = {temp[i]: i for i in range(1,12)}
 log2[0] = 0
 
 
-# OPTIMISTIC_INIT = 2**MAX_VAL  # something in the ball park of a solid score
-OPTIMISTIC_INIT = 0
 
 class NTuple:
-    def __init__(self, coords, max_val, LUT=None, E=None, A=None):
+    def __init__(self, coords, max_val, initial_values=0, LUT=None, E=None, A=None):
         """
            Parameters:
            coords ([int]): list of board coordinates (order is important)
@@ -36,7 +35,7 @@ class NTuple:
         self.size = size
 
         if LUT is None:
-            self.LUT = np.zeros(size) + OPTIMISTIC_INIT  # TODO remove hardcoded optimistic initialization
+            self.LUT = np.zeros(size) + initial_values
             self.E = np.zeros(size)
             self.A = np.zeros(size)
         else:
@@ -72,39 +71,51 @@ class NTuple:
 
 
 class NTupleNetwork:
-    def __init__(self, all_coords, max_val, height=4, width=4, symmetries=True):
+    def __init__(self, specs):
         self.tuples = [] 
-        self.init_tuples(all_coords, max_val, height, width, symmetries)
+        self.specs = specs
+        self.init_tuples(specs)
+        
 
-    def init_tuples(self, all_coords, max_val, height, width, symmetries):
+    def init_tuples(self, specs):
         def reflect_horizontal(coords):
             return [(height-1-y,x) for (y,x) in coords]
         
         def rotate_clockwise(coords):
             # e.g. (y,x)=(3,3) --> (3,0); (y,x)=(2,1) --> (1,1) 
             return [(x,width-1-y) for (y,x) in coords]
-
         
+        all_coords = NTupleNetwork.tuple_coords_from_layout(specs['layout'])
+        height = specs['height']
+        width = specs['width']
+        max_val = log2[specs['max_tile']]
+        symmetries = specs['symmetries']
+        optimistic_init = specs['optimistic_init']
+
+        assert (height == width) or (not symmetries), "Non-rectangular board doesn't support symmetries"
+
         for coords in all_coords:
             rotated_coords = [(y,x) for (y,x) in coords]
             reflected_rotated_coords = reflect_horizontal(coords)
 
-            original_n_tuple = NTuple(rotated_coords, max_val)
+            original_n_tuple = NTuple(rotated_coords, max_val, initial_values=optimistic_init)
             LUT = original_n_tuple.LUT
             E = original_n_tuple.E
             A = original_n_tuple.A
             self.tuples.append(original_n_tuple)
 
             if symmetries:
-                copy_tuple = NTuple(reflected_rotated_coords, max_val, LUT=LUT, E=E, A=A)
+                copy_tuple = NTuple(reflected_rotated_coords, max_val, 
+                                    initial_values=optimistic_init, LUT=LUT, E=E, A=A)
                 self.tuples.append(copy_tuple)
 
                 for _ in range(3):
                     rotated_coords = rotate_clockwise(rotated_coords)
                     reflected_rotated_coords = rotate_clockwise(reflected_rotated_coords)
 
-                    self.tuples.append(NTuple(rotated_coords, max_val,LUT=LUT, E=E, A=A))
-                    self.tuples.append(NTuple(reflected_rotated_coords, max_val,LUT=LUT, E=E, A=A))
+                    self.tuples.append(NTuple(rotated_coords, max_val, 
+                                              initial_values=optimistic_init,LUT=LUT, E=E, A=A))
+                    self.tuples.append(NTuple(reflected_rotated_coords, max_val,    initial_values=optimistic_init ,LUT=LUT, E=E, A=A))
 
 
     def evaluate(self, board):
@@ -117,25 +128,31 @@ class NTupleNetwork:
         for n_tuple in self.tuples:
             n_tuple.update(board, difference / len(self.tuples), diff_lambda)
 
+    @staticmethod
+    def tuple_coords_from_layout(layout):
+        layouts = [np.array(a) for a in layout]
+        all_coords = [np.argwhere(locations == 1) for locations in layouts]
+        all_coords = [[tuple(row) for row in coords] for coords in all_coords]
+        return all_coords
+
 
 
 class TDAgent:
-    def __init__(self, all_coords, max_val, meta_learning_rate, trace_decay, 
-                 width=4, height=4, symmetries=True):
-        self.width = width
-        self.height = height
-        NTN = NTupleNetwork(all_coords, max_val, 
-                            height=height, width=width,symmetries=symmetries)
+    def __init__(self, specs):
+        self.width = specs['width']
+        self.height = specs['height']
+        self.max_val = log2[specs['max_tile']]
+        
+        NTN = NTupleNetwork(specs)
         self.NTN = NTN
         self.m = len(NTN.tuples)
-        self.max_val = max_val
 
         self.history = []  # reset after each episode
         self.afterstates = []  # reset after each episode
 
-        # TODO learning rate should appear somewhere
-        self.meta_learning_rate = meta_learning_rate
-        self.trace_decay = trace_decay  # TD(lambda)
+        self.meta_learning_rate = specs['meta_learning_rate']
+        trace_decay = specs['trace_decay']  # TD(lambda)
+        self.trace_decay = trace_decay
         if trace_decay == 0:
             self.h = 1
         else:
@@ -201,7 +218,7 @@ class TDAgent:
         move, _ = max(list(evaluations.items()), key=lambda pair: pair[1])
         return move
     
-    def save(self, folder_path='agents/', name=None):
+    def save(self, folder_path='agents/', name=None, verbose=True):
         # TODO this will produce an unintuitive order for the agents when one deletes agent1 and keeps agent2
         base_filename = 'agent'
         extension = '.pkl'
@@ -216,7 +233,8 @@ class TDAgent:
 
         with open(path, 'wb') as file:
             pickle.dump(self.NTN, file)
-        print(f'Agent saved in {path}')
+        if verbose:
+            print(f'Agent saved in {path}')
     
     @classmethod
     def load(params, path):
@@ -260,7 +278,7 @@ class TDAgent:
         #     save_game(history, base_name='td')
 
         return env.score, np.max(state)
-
+    
 
 
 
@@ -296,69 +314,22 @@ def generate_all_boards(w, h, vals):
 #         AGENT INITIALIZATION
 # =========================================
 
-all_locations = [\
-    [[0,0,0,0],
-    [0,0,0,0],
-    [1,1,0,0],
-    [1,1,1,1]],
-
-    [[0,0,0,0],
-    [1,1,0,0],
-    [1,1,1,1],
-    [0,0,0,0]],
-
-    [[1,1,0,0], 
-     [1,1,1,1],
-     [0,0,0,0],
-     [0,0,0,0]],
-
-    [[0,1,1,1], 
-     [0,1,1,1],
-     [0,0,0,0],
-     [0,0,0,0]],
-
-    [[0,0,0,0], 
-     [0,1,1,1],
-     [0,1,1,1],
-     [0,0,0,0]]
-]
-
-# all_locations = [\
-#     [[0,0,0],
-#     [1,1,1],
-#     [1,1,1]]
-# ]
-
-# all_locations = [\
-#     [[1,1,1],
-#     [1,1,1]]
-# ]
-
-# all_locations = [\
-#     [[1,1,1,1]]
-# ]
-
-
-all_locations = [np.array(a) for a in all_locations]
-all_coords = [np.argwhere(locations == 1) for locations in all_locations]
-all_coords = [[tuple(row) for row in coords] for coords in all_coords]
-
-
+agent_specs = json.load(open("agents/4x4symmetry.json", "r"))
+agent = TDAgent(agent_specs)
 # agent = TDAgent.load('agents/agent3.pkl')
-MAX_VAL = 11
+# TODO if saved file exists in location and load it if so
+
+
+
+max_tile = agent_specs['max_tile']
+max_val = log2[max_tile]
+width = agent_specs['width']
+height = agent_specs['height']
+update_freq = agent_specs['update_freq']
+save_freq = agent_specs['save_freq']
+
 vals = [0]
-vals += [2**i for i in range(1, MAX_VAL + 1)]
-
-width = 4
-height = 4
-meta_learning_rate = 1
-trace_decay = 0.9
-agent = TDAgent(all_coords, MAX_VAL, meta_learning_rate, trace_decay, 
-                width=width, height=height, symmetries=True)
-
-# NOTE that symmetries=False required for non-rectangular boards
-
-
+vals += [2**i for i in range(1, max_val + 1)]
 
 # =========================================
 #         MAIN LOOP
@@ -368,8 +339,6 @@ agent = TDAgent(all_coords, MAX_VAL, meta_learning_rate, trace_decay,
 episode = 0
 scores = []
 top_tiles = []
-update_freq = 100
-save_freq = 100
 start_time = time.time()
 while True:
     score, top_tile = agent.learn_from_episode()
@@ -386,7 +355,7 @@ while True:
         # percentage_perfect = np.count_nonzero(np.array(top_tiles[episode-update_freq:]) == 2**MAX_VAL) / update_freq
         # print(f'Episode {episode}: average score {round(avg_score)}, average highest tile {round(avg_top_tile)}, fraction of perfect {percentage_perfect:.2f}')
         seconds_per_game = (end_time-start_time) / update_freq
-        print(f'Episode {episode}: avg score {round(avg_score)}, avg top tile {round(avg_top_tile)}, avg time {round(seconds_per_game)}')
+        print(f'Episode {episode}: avg score {round(avg_score)}, avg top tile {round(avg_top_tile)}, avg time {seconds_per_game:.2f}')
         start_time = time.time()
 
         # LUTs = [n_tuple.LUT for n_tuple in agent.NTN.tuples]  # contains duplicates but doesn't matter
@@ -397,12 +366,8 @@ while True:
         # print(f'Fraction of LUT elements untouched: {frac_untouched:.5f}')
     
     if episode % save_freq == 0:
-        agent.save(name='senpai')
+        agent.save(name=agent_specs['name'], verbose=False)
         
-
-agent.save()
-
-
 
 
 # =========================================
