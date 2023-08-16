@@ -248,7 +248,7 @@ class TDAgent:
             print(f'Agent saved in {path}')
     
     @classmethod
-    def load(specs):
+    def load(cls, specs):
         path = 'agents/' + specs['name'] + '.pkl'
         with open(path, 'rb') as file:
             NTN = pickle.load(file)
@@ -313,13 +313,13 @@ def generate_all_boards(w, h, vals):
 # =========================================
 
 AGENT_NAME = '4x4'
-SAVING_ON = False
+SAVING_ON = True
 specs_path = 'specs/' + AGENT_NAME + '.json'
 agent_specs = json.load(open(specs_path, "r"))
-agent = TDAgent(agent_specs)
+# agent = TDAgent(agent_specs)
 
 # agent_specs = json.load(open("specs/2x3.json", "r"))
-# agent = TDAgent.load(agent_specs)
+agent = TDAgent.load(agent_specs)
 
 
 
@@ -352,10 +352,9 @@ while True:
         avg_top_tile = np.mean(top_tiles[episode-update_freq:])
         end_time = time.time()
 
-        # percentage_perfect = np.count_nonzero(np.array(top_tiles[episode-update_freq:]) == 2**MAX_VAL) / update_freq
-        # print(f'Episode {episode}: average score {round(avg_score)}, average highest tile {round(avg_top_tile)}, fraction of perfect {percentage_perfect:.2f}')
+        percentage_perfect = np.count_nonzero(np.array(top_tiles[episode-update_freq:]) == 2**max_val) / update_freq
         seconds_per_game = (end_time-start_time) / update_freq
-        print(f'Episode {episode}: avg score {round(avg_score)}, avg top tile {round(avg_top_tile)}, avg time {seconds_per_game:.2f}')
+        print(f'Episode {episode}: avg score {round(avg_score)}, avg top tile {round(avg_top_tile)}, percentage perfect {percentage_perfect:.2f}, avg time {seconds_per_game:.2f}')
         start_time = time.time()
 
         # LUTs = [n_tuple.LUT for n_tuple in agent.NTN.tuples]  # contains duplicates but doesn't matter

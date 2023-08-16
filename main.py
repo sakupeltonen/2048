@@ -113,11 +113,19 @@ def replay_game(path):
             if state_index < len(history) - 1:
                 state_index += 1
 
+        if direction == 'up':
+            state_index += 10
+            state_index = min(state_index, len(history)-1)
+
+        if direction == 'down':
+            state_index -= 10
+            state_index = max(state_index, 0)
+
         env.board = history[state_index]
         env.render()
 
     pg_main(width, height, initialize, handle_keypress)
 
 
-human_play(width=3, height=2)
-# replay_game('games/128bad.pkl')
+# human_play(width=3, height=2)
+replay_game('games/4x4-2048.pkl')
