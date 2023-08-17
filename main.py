@@ -11,7 +11,9 @@ from tools import save_game
 
 np.random.seed(42)
 
-constants = json.load(open("constants.json", "r"))
+script_dir = os.path.dirname(os.path.abspath(__file__))
+constants_path = os.path.join(script_dir,'constants.json')
+constants = json.load(open(constants_path, "r"))
 
 direction_from_pg = {
     pg.K_LEFT: 'left', 

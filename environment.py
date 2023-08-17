@@ -1,11 +1,13 @@
 import numpy as np
 import pygame
 import json
-
+import os
 import gymnasium as gym
 from gymnasium import spaces
 
-constants = json.load(open("constants.json", "r"))
+script_dir = os.path.dirname(os.path.abspath(__file__))
+constants_path = os.path.join(script_dir,'constants.json')
+constants = json.load(open(constants_path, "r"))
 theme = 'light'
 # my_font = pygame.font.SysFont(constants["font"], constants["font_size"], bold=True)
 

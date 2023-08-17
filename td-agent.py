@@ -254,7 +254,7 @@ class TDAgent:
         move, _ = max(list(evaluations.items()), key=lambda pair: pair[1])
         return move
     
-    def save(self, folder_path='agents/', name=None, verbose=True):
+    def save_old(self, folder_path='agents/', name=None, verbose=True):
         base_filename = 'agent'
         extension = '.pkl'
         if name:
@@ -270,10 +270,23 @@ class TDAgent:
             pickle.dump(self.NTN, file)
         if verbose:
             print(f'Agent saved in {path}')
+
+    def save(self, name, verbose=True):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        filename = name + '.pkl'
+        path = os.path.join(script_dir,'agents', filename)
+
+        with open(path, 'wb') as file:
+            pickle.dump(self.NTN, file)
+        if verbose:
+            print(f'Agent saved in {path}')
     
     @classmethod
     def load(cls, specs):
-        path = 'agents/' + specs['name'] + '.pkl'
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        filename = specs['name'] + '.pkl'
+        path = os.path.join(script_dir,'agents', filename)
+
         with open(path, 'rb') as file:
             NTN = pickle.load(file)
         agent = TDAgent(specs)  # creates a temp NTN, E, A before the real ones are loaded
@@ -347,7 +360,7 @@ def train(agent, agent_specs, n_episodes, saving_on=True):
 #         AGENT INITIALIZATION
 # =========================================
 
-# arguments: agent filename, new/load, n_episodes, saving on 
+# arguments: agent specs filename, load/new, n_episodes
 
 if __name__ == "__main__":
     agent_name = sys.argv[1]
@@ -355,8 +368,10 @@ if __name__ == "__main__":
     n_episodes = int(sys.argv[3])
     #saving_on = bool(sys.argv[4])
 
-    specs_path = 'specs/' + agent_name + '.json'
-    agent_specs = json.load(open(specs_path, "r"))
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    specs_file = agent_name + '.json'
+    path = os.path.join(script_dir,'specs', specs_file)
+    agent_specs = json.load(open(path, "r"))
 
     max_tile = agent_specs['max_tile']
     max_val = log2[max_tile]
