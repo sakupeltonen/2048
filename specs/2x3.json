@@ -12,7 +12,7 @@
     "optimistic_init": 0,
 
     "update_freq": 200,
-    "save_freq": 1000,
+    "save_freq": 200,
     "start_tile": 0,
 
     "symmetries": false,

@@ -9,7 +9,7 @@ import json
 import sys
 from collections import deque
 from environment import Env2048
-from tools import save_game
+from tools import save_game, save_arr
 
 # np.random.seed(2)
 
@@ -353,6 +353,9 @@ def train(agent, agent_specs, n_episodes, saving_on=True):
 
         if episode % save_freq == 0 and saving_on:
             agent.save(name=agent_specs['name'], verbose=False)
+            save_arr(scores, agent_specs['name'], 'score')
+            save_arr(top_tiles, agent_specs['name'], 'toptile')
+
         
 # TODO save top tile, score
 
@@ -387,6 +390,11 @@ if __name__ == "__main__":
     train(agent, agent_specs, n_episodes, saving_on=True)
 
 
+# agent_specs = json.load('specs/2x3.json', 'r')
+# agent = TDAgent(agent_specs)
+# # agent = TDAgent.load(agent_specs)
+# n_episodes = 1000
+# train(agent, agent_specs, n_episodes, saving_on=True)
 
 
 # =========================================

@@ -14,3 +14,13 @@ def save_game(history, name):
 
     with open(path, 'wb') as file:
         pickle.dump(history, file)
+
+def save_arr(arr, agent_name, arr_name):
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    filename = agent_name + '-' + arr_name + '.txt'
+    path = os.path.join(script_dir,'logs', filename)
+
+    with open(path, 'w') as file:
+        for item in arr:
+            file.write("%s\n" % item)
+    
