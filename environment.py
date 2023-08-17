@@ -183,7 +183,7 @@ class Env2048(gym.Env):
 
     @classmethod
     def random_state(cls, width=4, height=4, max_power=6, n_tiles=8,render_mode='ansi'):
-        env = Env2048(width=width, height=height, empty=True,render_mode=render_mode)
+        env = Env2048(width=width, height=height)
         
         all_coords = [(y,x) for y in range(env.height) for x in range(env.width)]  # get list of all coordinates
         random_subset_indices = np.random.choice(len(all_coords), n_tiles, replace=False)
@@ -195,6 +195,19 @@ class Env2048(gym.Env):
         for i in range(n_tiles):
             c = random_coords[i]
             env.board[c[0]][c[1]] = tiles[i]
+
+        return env
+    
+    @classmethod 
+    def initial_with_tile(cls, val, width=4, height=4, render_mode='human'):
+        env = Env2048(width=width, height=height, render_mode=render_mode)
+
+        all_coords = [(y,x) for y in range(env.height) for x in range(env.width)]  # get list of all coordinates
+        random_index = np.random.choice(len(all_coords), 1)
+        c = [all_coords[idx] for idx in random_index][0]
+
+        env.board[c[0]][c[1]] = val
+        env.board = Env2048._place_random_tile(env.board)
 
         return env
     

@@ -56,9 +56,11 @@ def pg_main(width, height, initialize, handle_keypress):
 
 
 def human_play(width=4, height=4, initial_state=None):
-    env = Env2048(width=width, height=height, render_mode='human')
-    _ = env.reset(custom_state=initial_state)
-    # _ = env.reset(custom_state=[16,128,16,128,64,8,64,8,256,1024,256,1024,32,64,0,0])
+    # env = Env2048(width=width, height=height, render_mode='human')
+    # _ = env.reset(custom_state=initial_state)
+
+    env = Env2048.initial_with_tile(1024, width=width, height=height, render_mode='human')
+    
 
     history = [env.board.copy()]
     game_score = 0  # TODO fix score not being updated, outside of the scope of handle_keypress
@@ -127,5 +129,5 @@ def replay_game(path):
     pg_main(width, height, initialize, handle_keypress)
 
 
-# human_play(width=3, height=2)
-replay_game('games/4x4-2048.pkl')
+human_play(width=4, height=4)
+# replay_game('games/4x4-2048.pkl')

@@ -6,11 +6,12 @@ import os
 import math
 import time
 import json
+import sys
 from collections import deque
 from environment import Env2048
 from tools import save_game
 
-np.random.seed(42)
+np.random.seed(2)
 
 temp = [2**i for i in range(12)]
 log2 = {temp[i]: i for i in range(1,12)}
@@ -32,8 +33,11 @@ class NTuple:
         n = len(coords)
         self.n = n
         self.max_val = max_val
-        size = (max_val+1) ** n
+        self.max_tile = 2**max_val
+        # TODO reduce the size of the LUT by not including the max_val. These entries are never updated anyway. Instead just return some high constant
+        size = max_val ** n
         self.size = size
+        self.winning_reward = 4*(2**max_val)  # TODO hardcoded
 
         if LUT is None:
             self.LUT = np.zeros(size) + initial_values
@@ -46,16 +50,20 @@ class NTuple:
 
 
     def index(self, board):
-        """ Get index i in LUT corresponding to the tuple given by board[self.coords] """
+        """ Get index i in LUT corresponding to the tuple given by board[self.coords] 
+        TODO explain how boards with max_tile are handled"""
         values = [board[i][j] for (i,j) in self.coords]
         values = [log2[v] for v in values]
         res = 0
         for i in range(self.n):
-            res += values[i] * (self.max_val ** i)
+            res += values[i] * ((self.max_val-1) ** i)
         return res
 
     def evaluate(self, board):
         """ NTuple(board) returns the value of the NTuple for the given tuple at board[self.coords] """
+        values = [board[i][j] for (i,j) in self.coords]
+        if self.max_tile in values:
+            return self.winning_reward
         return self.LUT[self.index(board)]
 
     def update(self, board, difference, diff_lambda):
@@ -183,11 +191,17 @@ class TDAgent:
     def update(self, reward, lost, won):
         afterstate1 = self.afterstates[-1]
         afterstate0 = self.afterstates[-2]
-        
+
+        # TODO change the order of lost and won, since they can change at the same time
         if lost:
-            diff = reward - self.NTN.evaluate(afterstate1)
+            # diff = reward - self.NTN.evaluate(afterstate1)  # TODO why was this 1
+            diff = reward - self.NTN.evaluate(afterstate0)
         elif won:
-            diff = 5*reward  # HARDCODED. TODO move multiplier(?) to specs
+            diff = reward 
+            # could it be that setting this high actually has the effect of delaying combining tiles: 
+            # states where large tiles can be combined are valued highly, whereas 2048 states are not. hence the algorithm never combines 
+            # still with the quick fix, the reward will be in the reward itself, as well as eventually be updated to the other states
+            # Just initialize NTN to give a very high value for all states with the max tile. this won't change. 
         else:
             diff = reward + self.NTN.evaluate(afterstate1) - self.NTN.evaluate(afterstate0)
         self.diffs.append(diff)
@@ -209,7 +223,18 @@ class TDAgent:
 
         else:
             # handle end of the game separately
-            for k in reversed(range(1,self.h+1)):
+            # TODO should we have k=0 here. losing states could have potentially high value, because of the combination possibilities (and since its decomposed into ntuples)
+            
+            # for k in reversed(range(1,self.h+1)):
+            #     if t-k < 0: 
+            #         continue
+            #     afterstate = self.afterstates[t-k]
+            #     self.NTN.update(afterstate, self.diff_sum)
+
+            #     delta_last = self.diffs[t-k]
+            #     self.diff_sum -= delta_last * (self.trace_decay ** k)  
+
+            for k in reversed(range(self.h)):
                 if t-k < 0: 
                     continue
                 afterstate = self.afterstates[t-k]
@@ -220,7 +245,6 @@ class TDAgent:
                 
 
 
-    # TODO some exploration?
     def move_greedy(self, state):
         evaluations = {}
         for move in range(4):
@@ -258,9 +282,14 @@ class TDAgent:
         return agent
     
     def learn_from_episode(self):
-        env = Env2048(width=self.width, height=self.height)
+        start_tile = self.specs['start_tile']
+        if start_tile == 0:
+            env = Env2048(width=self.width, height=self.height)
+            state = env.reset()
+        else:
+            env = Env2048.initial_with_tile(start_tile, width=self.width, height=self.height)
+            state = env.board
         self.afterstates = [env.board]  # this is an empty board before spawning any tiles
-        state = env.reset()
         self.history = [state]  # list of states
         self.diffs = [0]  # the 0 maintains consistent indexing with history, afterstates. doesn't correspond to any move
         self.diff_sum = 0
@@ -268,6 +297,7 @@ class TDAgent:
         
         while not done:
             move = self.move_greedy(state)
+            # Randomness in state transitions seems to provide enough exploration
             state, reward, lost, info = env.step(move)
             won = np.max(state) >= 2**self.max_val
             done = lost or won
@@ -281,9 +311,72 @@ class TDAgent:
 
 
 # =========================================
-#   FUNCTIONS FOR TESTING AND STATISTICS
+#         MAIN LOOP
 # =========================================
 
+def train(agent, agent_specs, n_episodes, saving_on=True):
+    scores = []
+    top_tiles = []
+    update_freq = agent_specs['update_freq']
+    save_freq = agent_specs['save_freq']
+    start_time = time.time()
+    for episode in range(n_episodes):
+        score, top_tile = agent.learn_from_episode()
+        
+        episode += 1
+        scores.append(score)
+        # TODO take start tile into account
+        top_tiles.append(top_tile)
+
+        if episode % update_freq == 0:
+            avg_score = np.mean(scores[episode-update_freq:])
+            avg_top_tile = np.mean(top_tiles[episode-update_freq:])
+            end_time = time.time()
+
+            percentage_perfect = np.count_nonzero(np.array(top_tiles[episode-update_freq:]) == 2**max_val) / update_freq
+            seconds_per_game = (end_time-start_time) / update_freq
+            print(f'Episode {episode}: avg score {round(avg_score)}, avg top tile {round(avg_top_tile)}, percentage perfect {percentage_perfect:.2f}, avg time {seconds_per_game:.2f}')
+            start_time = time.time()
+
+        if episode % save_freq == 0 and saving_on:
+            agent.save(name=agent_specs['name'], verbose=False)
+        
+# TODO save top tile, score
+
+# =========================================
+#         AGENT INITIALIZATION
+# =========================================
+
+# arguments: agent filename, new/load, n_episodes, saving on 
+
+if __name__ == "__main__":
+    agent_name = sys.argv[1]
+    load = bool(sys.argv[2])
+    n_episodes = int(sys.argv[3])
+    saving_on = bool(sys.argv[4])
+
+    specs_path = 'specs/' + agent_name + '.json'
+    agent_specs = json.load(open(specs_path, "r"))
+
+    max_tile = agent_specs['max_tile']
+    max_val = log2[max_tile]
+    width = agent_specs['width']
+    height = agent_specs['height']
+    
+    if load: 
+        agent = TDAgent.load(agent_specs)
+    else:
+        agent = TDAgent(agent_specs)
+
+    # print(f'Got {agent_name},{load}, {n_episodes}, {saving_on}')
+    train(agent, agent_specs, n_episodes, saving_on=saving_on)
+
+
+
+
+# =========================================
+#               DEBUGGING
+# =========================================
 
 def moving_average(data, window_size):
     window = np.ones(window_size) / window_size
@@ -306,86 +399,17 @@ def generate_all_boards(w, h, vals):
     lists = _generate_all([])
     return [np.array(l).reshape((h,w)) for l in lists]
 
-
-
-# =========================================
-#         AGENT INITIALIZATION
-# =========================================
-
-AGENT_NAME = '4x4'
-SAVING_ON = True
-specs_path = 'specs/' + AGENT_NAME + '.json'
-agent_specs = json.load(open(specs_path, "r"))
-# agent = TDAgent(agent_specs)
-
-# agent_specs = json.load(open("specs/2x3.json", "r"))
-agent = TDAgent.load(agent_specs)
+# window_size = 100
+# plt.plot(moving_average(scores, window_size))
+# plt.plot(moving_average(top_tiles, window_size))
 
 
 
-max_tile = agent_specs['max_tile']
-max_val = log2[max_tile]
-width = agent_specs['width']
-height = agent_specs['height']
+# vals = [0]
+# vals += [2**i for i in range(1, max_val + 1)]
 
+# ntuple = agent.NTN.tuples[0]
 
-# =========================================
-#         MAIN LOOP
-# =========================================
-
-
-episode = 0
-scores = []
-top_tiles = []
-update_freq = agent_specs['update_freq']
-save_freq = agent_specs['save_freq']
-start_time = time.time()
-while True:
-    score, top_tile = agent.learn_from_episode()
-    
-    episode += 1
-    scores.append(score)
-    top_tiles.append(top_tile)
-
-    if episode % update_freq == 0:
-        avg_score = np.mean(scores[episode-update_freq:])
-        avg_top_tile = np.mean(top_tiles[episode-update_freq:])
-        end_time = time.time()
-
-        percentage_perfect = np.count_nonzero(np.array(top_tiles[episode-update_freq:]) == 2**max_val) / update_freq
-        seconds_per_game = (end_time-start_time) / update_freq
-        print(f'Episode {episode}: avg score {round(avg_score)}, avg top tile {round(avg_top_tile)}, percentage perfect {percentage_perfect:.2f}, avg time {seconds_per_game:.2f}')
-        start_time = time.time()
-
-        # LUTs = [n_tuple.LUT for n_tuple in agent.NTN.tuples]  # contains duplicates but doesn't matter
-        # n_untouched = 0
-        # for LUT in LUTs:
-        #     n_untouched += np.count_nonzero(LUT==OPTIMISTIC_INIT)
-        # frac_untouched = n_untouched / (len(LUTs) * len(LUTs[0]))
-        # print(f'Fraction of LUT elements untouched: {frac_untouched:.5f}')
-    
-    if episode % save_freq == 0 and SAVING_ON:
-        agent.save(name=agent_specs['name'], verbose=False)
-        
-
-
-# =========================================
-#               DEBUGGING
-# =========================================
-
-
-
-window_size = 100
-plt.plot(moving_average(scores, window_size))
-plt.plot(moving_average(top_tiles, window_size))
-
-
-
-vals = [0]
-vals += [2**i for i in range(1, max_val + 1)]
-
-ntuple = agent.NTN.tuples[0]
-
-for board in generate_all_boards(width,height,vals):
-    if ntuple.evaluate(board) > 0.1: 
-        print(f'{board}\t{ntuple.evaluate(board):.2f}\n')
+# for board in generate_all_boards(width,height,vals):
+#     if ntuple.evaluate(board) > 0.1: 
+#         print(f'{board}\t{ntuple.evaluate(board):.2f}\n')
