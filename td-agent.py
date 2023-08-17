@@ -11,7 +11,7 @@ from collections import deque
 from environment import Env2048
 from tools import save_game
 
-np.random.seed(2)
+# np.random.seed(2)
 
 temp = [2**i for i in range(12)]
 log2 = {temp[i]: i for i in range(1,12)}
@@ -351,9 +351,9 @@ def train(agent, agent_specs, n_episodes, saving_on=True):
 
 if __name__ == "__main__":
     agent_name = sys.argv[1]
-    load = bool(sys.argv[2])
+    method = sys.argv[2]
     n_episodes = int(sys.argv[3])
-    saving_on = bool(sys.argv[4])
+    #saving_on = bool(sys.argv[4])
 
     specs_path = 'specs/' + agent_name + '.json'
     agent_specs = json.load(open(specs_path, "r"))
@@ -363,13 +363,13 @@ if __name__ == "__main__":
     width = agent_specs['width']
     height = agent_specs['height']
     
-    if load: 
+    if method=='load': 
         agent = TDAgent.load(agent_specs)
     else:
         agent = TDAgent(agent_specs)
 
-    # print(f'Got {agent_name},{load}, {n_episodes}, {saving_on}')
-    train(agent, agent_specs, n_episodes, saving_on=saving_on)
+    
+    train(agent, agent_specs, n_episodes, saving_on=True)
 
 
 

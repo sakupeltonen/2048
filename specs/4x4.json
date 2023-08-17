@@ -4,7 +4,7 @@
     "width": 4,
     "height": 4,
     "prob_2": 0.9,
-    "max_tile": 256,
+    "max_tile": 2048,
 	
 	"meta_learning_rate": 1,
 	"trace_decay": 0.6,
