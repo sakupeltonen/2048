@@ -4,15 +4,15 @@
     "width": 3,
     "height": 3,
     "prob_2": 0.9,
-    "max_tile": 32,
+    "max_tile": 64,
 	
 	"meta_learning_rate": 1,
 	"trace_decay": 0.9,
     "cut_off_weight": 0.1,
     "optimistic_init": 0,
 
-    "update_freq": 500,
-    "save_freq": 500,
+    "update_freq": 100,
+    "save_freq": 100,
     "start_tile": 0,
 
     "symmetries": true,

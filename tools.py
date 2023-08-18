@@ -1,5 +1,6 @@
 import os
 import pickle
+import numpy as np
 
 def save_game(history, name):
     """
@@ -23,4 +24,25 @@ def save_arr(arr, agent_name, arr_name):
     with open(path, 'w') as file:
         for item in arr:
             file.write("%s\n" % item)
+
+
+def moving_average(data, window_size):
+    window = np.ones(window_size) / window_size
+    return np.convolve(data, window, mode='valid')
+
+
+def generate_all_boards(w, h, vals):
+        
+    def _generate_all(prefix):
+        res = []
+        for val in vals:
+            a = [x for x in prefix]
+            a.append(val)
+            if len(a) == w * h:
+                res.append(a)
+            else:
+                res += _generate_all(a)
+        return res
     
+    lists = _generate_all([])
+    return [np.array(l).reshape((h,w)) for l in lists]

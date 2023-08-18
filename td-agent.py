@@ -9,7 +9,7 @@ import json
 import sys
 from collections import deque
 from environment import Env2048
-from tools import save_game, save_arr
+from tools import save_game, save_arr, moving_average, generate_all_boards
 
 # np.random.seed(2)
 
@@ -34,10 +34,9 @@ class NTuple:
         self.n = n
         self.max_val = max_val
         self.max_tile = 2**max_val
-        # TODO reduce the size of the LUT by not including the max_val. These entries are never updated anyway. Instead just return some high constant
         size = max_val ** n
         self.size = size
-        self.winning_reward = 4*(2**max_val)  # TODO hardcoded
+        self.winning_reward = (2**max_val)  # TODO hardcoded
 
         if LUT is None:
             self.LUT = np.zeros(size) + initial_values
@@ -168,7 +167,7 @@ class TDAgent:
         trace_decay = specs['trace_decay']  # TD(lambda)
         self.trace_decay = trace_decay
         if trace_decay == 0:
-            self.h = 1
+            self.h = 0
         else:
             self.h = int(math.log(specs['cut_off_weight'], trace_decay))  # cutoff index for updating history. earlier states have a weight of < trace_decay^h = 0.1
 
@@ -192,27 +191,33 @@ class TDAgent:
         afterstate1 = self.afterstates[-1]
         afterstate0 = self.afterstates[-2]
 
-        # TODO change the order of lost and won, since they can change at the same time
-        if lost:
-            diff = reward - self.NTN.evaluate(afterstate0)  # TODO won't update the value of the terminal state though. might be a problem
-        elif won:
-            diff = reward 
-            # could it be that setting this high actually has the effect of delaying combining tiles: 
-            # states where large tiles can be combined are valued highly, whereas 2048 states are not. hence the algorithm never combines 
-            # still with the quick fix, the reward will be in the reward itself, as well as eventually be updated to the other states
-            # Just initialize NTN to give a very high value for all states with the max tile. this won't change. 
+        if lost and not won:
+            diff = reward - self.NTN.evaluate(afterstate0)
         else:
             diff = reward + self.NTN.evaluate(afterstate1) - self.NTN.evaluate(afterstate0)
         self.diffs.append(diff)
 
-        t = len(self.history)-1
+        t = len(self.history)-1  # initial state has index 0
 
-        if t > self.h:
-            delta_last = self.diffs[t-self.h]
-            self.diff_sum -= delta_last * (self.trace_decay ** (self.h))
+        # h is zero if lambda=0
+        # V(s_t) + diff = V(S_t+1) + r_t. diff = V(S_t+1) + r_t - V(S_t)
+        # with lambda!= 0, also update earlier states s_t-k with a weight of lambda^k, up to k=h
+        # maintain the sum of weighted updates, diff_t + diff_{t+1} lambda + ... diff_{t+h} lambda^h for s_t
 
         self.diff_sum *= self.trace_decay
-        self.diff_sum += diff
+        self.diff_sum += self.diffs[t]  # same as diff
+
+        # e.g. 1 > 0. remove diff added at previous time step.
+        # h=1
+        # t=1: add first diff[1]
+        # this stays in the sum since 1  > 1 false
+        # t=2: sum becomes lamdba diff[1] + diff[2]
+        # 2 > 1 true
+        # delta_last = diff[2-1-1]= diff[0] = 0
+        if t > self.h:
+            # e.g. h=0: remove the diff added in the last iteration 
+            delta_last = self.diffs[t-self.h-1]
+            self.diff_sum -= delta_last * (self.trace_decay ** (self.h+1))
 
         if not (lost or won):
             if t >= self.h:
@@ -221,19 +226,8 @@ class TDAgent:
                 self.NTN.update(afterstate, self.diff_sum)
 
         else:
-            # handle end of the game separately
-            # TODO should we have k=0 here. losing states could have potentially high value, because of the combination possibilities (and since its decomposed into ntuples)
-            
-            # for k in reversed(range(1,self.h+1)):
-            #     if t-k < 0: 
-            #         continue
-            #     afterstate = self.afterstates[t-k]
-            #     self.NTN.update(afterstate, self.diff_sum)
-
-            #     delta_last = self.diffs[t-k]
-            #     self.diff_sum -= delta_last * (self.trace_decay ** k)  
-
-            for k in reversed(range(self.h)):
+            # update states s_t-k, which is s_{t-h},...,s_{t}
+            for k in reversed(range(self.h+1)):
                 if t-k < 0: 
                     continue
                 afterstate = self.afterstates[t-k]
@@ -314,7 +308,8 @@ class TDAgent:
             won = np.max(state) >= 2**self.max_val
             done = lost or won
 
-            self.afterstates.append(info['afterstate'])
+            afterstate = info['afterstate']
+            self.afterstates.append(afterstate)
             self.history.append(state)
 
             self.update(reward, lost, won)
@@ -345,6 +340,8 @@ def train(agent, agent_specs, n_episodes, saving_on=True):
             avg_top_tile = np.mean(top_tiles[episode-update_freq:])
             end_time = time.time()
 
+            max_tile = agent_specs['max_tile']
+            max_val = log2[max_tile]
             percentage_perfect = np.count_nonzero(np.array(top_tiles[episode-update_freq:]) == 2**max_val) / update_freq
             seconds_per_game = (end_time-start_time) / update_freq
             print(f'Episode {episode}: avg score {round(avg_score)}, avg top tile {round(avg_top_tile)}, percentage perfect {percentage_perfect:.2f}, avg time {seconds_per_game:.2f}')
@@ -356,15 +353,14 @@ def train(agent, agent_specs, n_episodes, saving_on=True):
             save_arr(top_tiles, agent_specs['name'], 'toptile')
 
         
-# TODO save top tile, score
-
 # =========================================
 #         AGENT INITIALIZATION
 # =========================================
 
 # arguments: agent specs filename, load/new, n_episodes
+DEBUG = False
 
-if __name__ == "__main__":
+if __name__ == "__main__" and not DEBUG:
     agent_name = sys.argv[1]
     method = sys.argv[2]
     n_episodes = int(sys.argv[3])
@@ -389,10 +385,9 @@ if __name__ == "__main__":
     train(agent, agent_specs, n_episodes, saving_on=True)
 
 
-# agent_specs = json.load('specs/2x3.json', 'r')
+# agent_specs = json.load(open('specs/3x3.json', 'r'))
 # agent = TDAgent(agent_specs)
-# # agent = TDAgent.load(agent_specs)
-# n_episodes = 1000
+# n_episodes = 10000
 # train(agent, agent_specs, n_episodes, saving_on=True)
 
 
@@ -400,28 +395,7 @@ if __name__ == "__main__":
 #               DEBUGGING
 # =========================================
 
-def moving_average(data, window_size):
-    window = np.ones(window_size) / window_size
-    return np.convolve(data, window, mode='valid')
-
-
-def generate_all_boards(w, h, vals):
-        
-    def _generate_all(prefix):
-        res = []
-        for val in vals:
-            a = [x for x in prefix]
-            a.append(val)
-            if len(a) == w * h:
-                res.append(a)
-            else:
-                res += _generate_all(a)
-        return res
-    
-    lists = _generate_all([])
-    return [np.array(l).reshape((h,w)) for l in lists]
-
-# window_size = 100
+# window_size = 500
 # plt.plot(moving_average(scores, window_size))
 # plt.plot(moving_average(top_tiles, window_size))
 
