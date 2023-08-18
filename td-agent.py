@@ -194,8 +194,7 @@ class TDAgent:
 
         # TODO change the order of lost and won, since they can change at the same time
         if lost:
-            # diff = reward - self.NTN.evaluate(afterstate1)  # TODO why was this 1
-            diff = reward - self.NTN.evaluate(afterstate0)
+            diff = reward - self.NTN.evaluate(afterstate0)  # TODO won't update the value of the terminal state though. might be a problem
         elif won:
             diff = reward 
             # could it be that setting this high actually has the effect of delaying combining tiles: 
