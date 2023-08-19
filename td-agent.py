@@ -13,8 +13,8 @@ from tools import save_game, save_arr, moving_average, generate_all_boards
 
 # np.random.seed(2)
 
-temp = [2**i for i in range(12)]
-log2 = {temp[i]: i for i in range(1,12)}
+temp = [2**i for i in range(14)]
+log2 = {temp[i]: i for i in range(1,14)}
 log2[0] = 0
 
 
