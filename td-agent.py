@@ -159,6 +159,8 @@ class TDAgent:
         self.NTN = NTN
         self.m = len(NTN.tuples)
 
+        self.learning_rate = specs['start_epsilon']
+
         # reset after each episode
         self.history = []  
         self.afterstates = [] 
@@ -247,6 +249,24 @@ class TDAgent:
         move, _ = max(list(evaluations.items()), key=lambda pair: pair[1])
         return move
     
+    def move_random(self, state):
+        legal_moves = []
+        for move in range(4):
+            _, _, _, info = Env2048._step(state, move, generate=False)
+            if info['valid_move']:
+                legal_moves.append(move)
+        return random.choice(legal_moves)
+    
+    def move(self, state):
+        if random.random() < self.learning_rate:
+            return self.move_random(state)
+        else:
+            return self.move_greedy(state)
+        
+    def update_learning_rate(self):
+        self.learning_rate = max(self.specs['min_epsilon'], self.learning_rate * self.specs['decay_factor'])
+
+    
     def save_old(self, folder_path='agents/', name=None, verbose=True):
         base_filename = 'agent'
         extension = '.pkl'
@@ -302,8 +322,7 @@ class TDAgent:
         done = False
         
         while not done:
-            move = self.move_greedy(state)
-            # Randomness in state transitions seems to provide enough exploration
+            move = self.move(state)
             state, reward, lost, info = env.step(move)
             won = np.max(state) >= 2**self.max_val
             done = lost or won
@@ -334,6 +353,9 @@ def train(agent, agent_specs, n_episodes, saving_on=True):
         scores.append(score)
         # TODO take start tile into account
         top_tiles.append(top_tile)
+
+        if episode % agent_specs['learning_rate_decay_freq'] == 0:
+            agent.update_learning_rate()
 
         if episode % update_freq == 0:
             avg_score = np.mean(scores[episode-update_freq:])
