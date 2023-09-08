@@ -12,6 +12,10 @@ theme = 'light'
 # my_font = pygame.font.SysFont(constants["font"], constants["font_size"], bold=True)
 
 
+temp = [2**i for i in range(14)]
+log2 = {temp[i]: i for i in range(1,14)}
+log2[0] = 0
+
 
 class OnehotWrapper(gym.ObservationWrapper):
     """ Convert observation (board) to array of one-hot vectors """
@@ -20,10 +24,12 @@ class OnehotWrapper(gym.ObservationWrapper):
         super(OnehotWrapper, self).__init__(env)
     
     def to_onehot(self):
-        onehot = np.zeros((*self.env.board.shape, self.env.maxval + 1), dtype=np.bool_)
+        n = log2[self.env.max_tile] + 1
+        onehot = np.zeros((*self.env.board.shape, n), dtype=np.bool_)
 
         rows, cols = np.indices(self.env.board.shape)
-        onehot[rows, cols, self.env.board] = 1
+        log_board = np.vectorize(log2.get)(self.env.board)
+        onehot[rows, cols, log_board] = 1
         return onehot
     
     def reset(self, **kwargs):
@@ -56,10 +62,6 @@ class AfterstateWrapper(gym.ObservationWrapper):
 class Env2048(gym.Env):
     metadata = {"render_modes": ["ansi","human"]}
 
-    PROB_2 = 0.9
-    MAX_TILE = 4096
-    # PROB_2 = 1  # TEMP
-
     action_to_int = {
         'down': 0,
         'left': 1,
@@ -67,11 +69,13 @@ class Env2048(gym.Env):
         'right': 3
     }
 
-    def __init__(self, width=4, height=4, render_mode='ansi', screen=None):
+    def __init__(self, width=4, height=4, prob_2=0.9, max_tile=4096, render_mode='ansi', screen=None):
         self.width = width
         self.height = height
+        self.prob_2 = prob_2
+        self.max_tile = max_tile
         self.observation_space = spaces.Box(low=0,
-                                            high=Env2048.MAX_TILE,
+                                            high=max_tile,
                                             shape=(height, width),
                                             dtype=np.int32)
         self.action_space = spaces.Discrete(4)
@@ -123,9 +127,8 @@ class Env2048(gym.Env):
     def close(self):
         pass
     
-    @staticmethod
-    def _sample_tile():
-        if np.random.random() < Env2048.PROB_2:
+    def _sample_tile(self):
+        if np.random.random() < self.prob_2:
             return 2
         else:
             return 4
@@ -137,7 +140,7 @@ class Env2048(gym.Env):
         assert len(zero_coords) > 0
         random_index = np.random.randint(0,len(zero_coords))
         c = zero_coords[random_index]
-        self.board[c[0]][c[1]] = Env2048._sample_tile()
+        self.board[c[0]][c[1]] = self._sample_tile()
         return c
         
     
@@ -164,7 +167,7 @@ class Env2048(gym.Env):
 
 
     def step(self, move, generate=True):
-        assert isinstance(move, int)
+        # assert isinstance(move, int)
         
         old_board = self.board.copy()  # compare with this to see if move is legal
         
@@ -181,7 +184,7 @@ class Env2048(gym.Env):
         valid_move = not np.array_equal(self.board, old_board)
 
         info = {'valid_move': valid_move}
-        if generate: 
+        if valid_move and generate: 
             loc = self._place_random_tile()
             info['spawn_location'] = loc
         else:
