@@ -12,10 +12,52 @@ theme = 'light'
 # my_font = pygame.font.SysFont(constants["font"], constants["font_size"], bold=True)
 
 
+
+class OnehotWrapper(gym.ObservationWrapper):
+    """ Convert observation (board) to array of one-hot vectors """
+
+    def __init__(self, env):
+        super(OnehotWrapper, self).__init__(env)
+    
+    def to_onehot(self):
+        onehot = np.zeros((*self.env.board.shape, self.env.maxval + 1), dtype=np.bool_)
+
+        rows, cols = np.indices(self.env.board.shape)
+        onehot[rows, cols, self.env.board] = 1
+        return onehot
+    
+    def reset(self, **kwargs):
+        _ = self.env.reset(**kwargs)
+        return self.to_onehot()
+    
+    def step(self, move, **kwargs):
+        _, reward, done, info = self.env.step(move, **kwargs)
+        _board = self.to_onehot()
+        return _board, reward, done, info
+        
+
+class AfterstateWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super(AfterstateWrapper, self).__init__(env) 
+
+    # TODO not sure if want to do something with the intial state, where two tiles are spawned
+
+    def step(self, move, **kwargs):
+        _board, reward, done, info = self.env.step(move, **kwargs)
+        board_copy = _board.copy()
+        if info['valid_move']:
+            c = info['spawn_location']
+            board_copy[c[0]][c[1]] = 0
+        
+        # TODO should also return the final result
+        return board_copy, reward, done, info
+
+
 class Env2048(gym.Env):
     metadata = {"render_modes": ["ansi","human"]}
 
-    PROB_2 = 0.9  
+    PROB_2 = 0.9
+    MAX_TILE = 4096
     # PROB_2 = 1  # TEMP
 
     action_to_int = {
@@ -29,7 +71,7 @@ class Env2048(gym.Env):
         self.width = width
         self.height = height
         self.observation_space = spaces.Box(low=0,
-                                            high=2**16,
+                                            high=Env2048.MAX_TILE,
                                             shape=(height, width),
                                             dtype=np.int32)
         self.action_space = spaces.Discrete(4)
@@ -48,8 +90,8 @@ class Env2048(gym.Env):
             return self.board
         if custom_state is None:
             self.board = np.zeros((self.height, self.width), dtype=np.int32)
-            self.board = Env2048._place_random_tile(self.board)
-            self.board = Env2048._place_random_tile(self.board)
+            self._place_random_tile()
+            self._place_random_tile()
         else:
             # custom_state possibly given as a one-dimensional list (in row-major order), or 
             # as a two-dimensional np.array
@@ -88,69 +130,71 @@ class Env2048(gym.Env):
         else:
             return 4
 
-    @staticmethod
-    def _place_random_tile(board):
-        zero_coords = np.argwhere(board == 0)
-        res = board.copy()
-        if len(zero_coords) > 0:
-            random_index = np.random.randint(0,len(zero_coords))
-            c = zero_coords[random_index]
-            res[c[0]][c[1]] = Env2048._sample_tile()
-        return res
+    def _place_random_tile(self):
+        """ Place a random tile on board. Return the coordinate where the tile was placed. 
+        Assumes that the board is not full."""
+        zero_coords = np.argwhere(self.board == 0)
+        assert len(zero_coords) > 0
+        random_index = np.random.randint(0,len(zero_coords))
+        c = zero_coords[random_index]
+        self.board[c[0]][c[1]] = Env2048._sample_tile()
+        return c
+        
     
-    @staticmethod
-    def is_done(board):
-        zero_coords = np.argwhere(board == 0)
+    def is_done(self):
+        zero_coords = np.argwhere(self.board == 0)
         if len(zero_coords) > 0:
             return False
         
-        def exists_mergeable(board):
-            height = len(board)
-            width = len(board[0])
-            # Tests if two vertically adjacent tiles can be combined on board
+        def exists_mergeable(_board):
+            # Tests if two vertically adjacent tiles can be combined on _board
+            height = len(_board)
+            width = len(_board[0])
+            
             for col in range(width):
                 for row in range(1,height):
-                    if board[row-1][col] == board[row][col]:
+                    if _board[row-1][col] == _board[row][col]:
                         return True
             return False
 
-        board_rotated = np.rot90(board)
-        return not exists_mergeable(board) and not exists_mergeable(board_rotated)
+        board_rotated = np.rot90(self.board)  
+        # returns a rotated view of the original data. do not modify board_rotated!
+        return not exists_mergeable(self.board) and not exists_mergeable(board_rotated)
+    
 
-    @staticmethod
-    def _step(board, move, generate=True):
-        if isinstance(move, str):
-            move = Env2048.action_to_int[move]
 
-        board_rotated = np.rot90(board.copy(), k=move)  # note that the rotated board is a view of the original array (still linked)
+    def step(self, move, generate=True):
+        assert isinstance(move, int)
         
-        board_updated, reward = Env2048._move_down(board_rotated)
-        afterstate = np.rot90(board_updated, k=4-move)
+        old_board = self.board.copy()  # compare with this to see if move is legal
+        
+        # rotated view of the original array
+        self.board = np.rot90(self.board, k=move)
 
-        # directions that don't slide/combine any tiles are not valid (but also don't give any points)
-        valid_move = not np.array_equal(board, afterstate)
-        # A new tile is generated if the move is valid. generate=False turns off new tile generation
-        if valid_move and generate:
-            board_result = Env2048._place_random_tile(afterstate)
-        else:
-            board_result = afterstate
+        # move tiles down in the rotated view
+        reward = self._move_down()
+
+        # reverse the rotation
+        self.board = np.rot90(self.board, k=4-move)
+
+        # move is legal if at least one tile moved
+        valid_move = not np.array_equal(self.board, old_board)
+
         info = {'valid_move': valid_move}
-        info['afterstate'] = afterstate
+        if generate: 
+            loc = self._place_random_tile()
+            info['spawn_location'] = loc
+        else:
+            info['spawn_location'] = None
 
-        done = Env2048.is_done(board_result)
+        done = self.is_done()
 
-        return board_result, reward, done, info
+        return self.board, reward, done, info
+
     
-    def step(self, move):
-        board, reward, done, info = Env2048._step(self.board, move)
-        self.board = board
-        self.score += reward
-        return board, reward, done, info
-    
-    @staticmethod
-    def _move_down(board):
-        height = len(board)
-        width = len(board[0])
+    def _move_down(self):
+        height = len(self.board)
+        width = len(self.board[0])
 
         reward = 0
         # Handle each column independently
@@ -160,28 +204,28 @@ class Env2048(gym.Env):
             # moving row gets values height-2 to 0. Maintain that moving_row < target_row. 
             for moving_row in reversed(range(height - 1)):
                 # nothing to move
-                if board[moving_row][col] == 0:
+                if self.board[moving_row][col] == 0:
                     continue
                 # target row is empty. move non-zero value there
-                elif board[target_row][col] == 0:
-                    board[target_row][col] = board[moving_row][col]
-                    board[moving_row][col] = 0
+                elif self.board[target_row][col] == 0:
+                    self.board[target_row][col] = self.board[moving_row][col]
+                    self.board[moving_row][col] = 0
                 # target and moving row non-empty
                 else:
                     # tiles can be combined
-                    if board[target_row][col] == board[moving_row][col]:
-                        reward += board[target_row][col]
-                        board[target_row][col] *= 2
-                        board[moving_row][col] = 0
+                    if self.board[target_row][col] == self.board[moving_row][col]:
+                        reward += self.board[target_row][col]
+                        self.board[target_row][col] *= 2
+                        self.board[moving_row][col] = 0
                         target_row -= 1
                     # tiles can't be combined. slide moving tile down
                     else:
                         # store value of moving tile, in case moving_row == target_row-1
-                        val = board[moving_row][col]
-                        board[moving_row][col] = 0
-                        board[target_row-1][col] = val
+                        val = self.board[moving_row][col]
+                        self.board[moving_row][col] = 0
+                        self.board[target_row-1][col] = val
                         target_row -=1
-        return board, reward
+        return reward
 
     @classmethod
     def random_state(cls, width=4, height=4, max_power=6, n_tiles=8,render_mode='ansi'):
@@ -209,7 +253,7 @@ class Env2048(gym.Env):
         c = [all_coords[idx] for idx in random_index][0]
 
         env.board[c[0]][c[1]] = val
-        env.board = Env2048._place_random_tile(env.board)
+        env._place_random_tile()
 
         return env
     

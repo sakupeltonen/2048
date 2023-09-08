@@ -73,7 +73,8 @@ def human_play(width=4, height=4, initial_state=None):
 
     def handle_keypress(direction):
         nonlocal game_score
-        board, reward, terminated, info = env.step(direction)
+        move = Env2048.action_to_int[direction]
+        board, reward, terminated, info = env.step(move)
         game_score += reward
         if not info['valid_move']:
             print(f'{direction} is not a valid move')
@@ -88,7 +89,7 @@ def human_play(width=4, height=4, initial_state=None):
                 print(f"Game over. Total score: {game_score}")
 
     pg_main(width, height, initialize, handle_keypress)
-    save_game(history)
+    save_game(history, 'kek')
 
 
 
