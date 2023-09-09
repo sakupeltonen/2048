@@ -87,6 +87,7 @@ class Env2048(gym.Env):
 
         self.board = np.zeros((height, width), dtype=np.int32)
         self.score = 0
+        self.legal_move_count = 0
         
 
     def reset(self, empty=False, custom_state=None):
@@ -189,6 +190,9 @@ class Env2048(gym.Env):
             info['spawn_location'] = loc
         else:
             info['spawn_location'] = None
+
+        if valid_move:
+            self.legal_move_count += 1
 
         done = self.is_done()
 

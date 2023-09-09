@@ -19,6 +19,8 @@ log2[0] = 0
 
 
 
+# NOTE : this agent assumes environment doesn't modify the state in place! this is not true in this branch
+
 class NTuple:
     def __init__(self, coords, max_val, initial_values=0, LUT=None, E=None, A=None):
         """
