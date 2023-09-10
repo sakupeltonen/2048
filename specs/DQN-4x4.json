@@ -18,8 +18,9 @@
     "gamma": 0.7,
 
     "layer_size": 512,
+    "tau": 0.005,
     "sync_target_net_freq": 1000,
-    
+
     "test_freq": 200,
     "test_size": 30
 }

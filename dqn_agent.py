@@ -123,12 +123,17 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
     actions_v = torch.tensor(actions).to(device)
     rewards_v = torch.tensor(rewards).to(device)
     done_mask = torch.BoolTensor(dones).to(device)
-    # TODO some spikes in the loss. make sure that the done mask is working
 
     state_action_values = net(states_v).gather(
         1, actions_v.unsqueeze(-1)).squeeze(-1)
     with torch.no_grad():
-        next_state_values = tgt_net(next_states_v).max(1)[0]
+        # next_state_values = tgt_net(next_states_v).max(1)[0]
+
+        # Double Q-learning 
+        next_state_actions = net(next_states_v).max(1)[1]
+        next_state_values = tgt_net(next_states_v).gather(1, next_state_actions.unsqueeze(-1)).squeeze(-1)
+        
+        
         next_state_values[done_mask] = 0.0
         next_state_values = next_state_values.detach()
 
@@ -268,31 +273,3 @@ if __name__ == "__main__":
         optimizer.step()
 
     # writer.close()
-
-
-
-
-
-
-    # parser.add_argument('--width', type=int, default=4,
-    #                     help='Width of the board. Default is 4.')
-    # parser.add_argument('--height', type=int, default=4,
-    #                     help='Height of the board. Default is 4.')
-    # parser.add_argument('--prob-2', type=float, default=0.9,
-    #                     help='Probability of spawning a 2. Default is 0.9. P(4) = 1 - P(2).')
-    # parser.add_argument('--max-tile', type=int, default=512,
-    #                     help='Maximum tile. Game is won once the maximum tile is reached.')
-    # parser.add_argument('--epsilon-start', type=float, default=1,
-    #                     help='Initial value for epsilon-greedy policy. Decreases linearly in the number of episodes.')
-    # parser.add_argument('--epsilon-final', type=float, default=0.01,
-    #                     help='Final value for epsilon-greedy policy. Decreases linearly in the number of episodes.')
-    # parser.add_argument('--epsilon-decay-last-episode', type=int, default=10000)
-    # parser.add_argument('--learning-rate', type=float, default=0.005)
-    # parser.add_argument('--replay-size', type=int, default=20000)
-    # parser.add_argument('--replay-start-size', type=int, default=1000, 
-    #                     help='Number of frames before to initiate replay buffer before starting training.')
-    # parser.add_argument('--batch-size', type=int, default=16)
-    # parser.add_argument('--gamma', type=float, default=0.95, help='Decay rate in Bellman equation')
-    # parser.add_argument('--sync-target-net-freq', type=int, default=200, help='Frequency of syncing DQNs')
-    # parser.add_argument('--test-freq', type=int, default=200, help='Frequency of testing the agent')
-    # parser.add_argument('--test-size', type=int, default=30, help='Number of games used to test the agent')
