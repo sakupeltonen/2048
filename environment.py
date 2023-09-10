@@ -91,6 +91,8 @@ class Env2048(gym.Env):
         
 
     def reset(self, empty=False, custom_state=None):
+        self.score = 0
+        self.legal_move_count = 0
         if empty: 
             return self.board
         if custom_state is None:

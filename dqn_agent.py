@@ -13,11 +13,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-"""
-TODO
-- save max tile 
-- test freq of illegal moves
-"""
 
 from tensorboardX import SummaryWriter
 
@@ -61,7 +56,7 @@ class DQNAgent:
         self.invalid_move_count = 0
 
     @torch.no_grad()
-    def play_step(self, net, epsilon=0.0, device="cpu"):
+    def play_step(self, net, epsilon=0.0, testing=False, device="cpu"):
         # note : nothing prevents from taking moves that don't actually change the board. 
         # the agent should learn to not do this but make sure
         if np.random.random() < epsilon:
@@ -82,11 +77,12 @@ class DQNAgent:
         if not info['valid_move']: 
             self.invalid_move_count += 1
 
-        # PROBLEM: agent can get stuck with illegal moves
-        # temp fix: take a random move if the chosen move was illegal
-        while not info['valid_move']:
-            action = env.action_space.sample()
-            new_state, reward, is_done, info = self.env.step(action)
+        
+        if testing or epsilon==0:
+            # we don't want the agent to get stuck with an invalid move during testing (epsilon=0)
+            while not info['valid_move']:
+                action = env.action_space.sample()
+                new_state, reward, is_done, info = self.env.step(action)
 
         self.score += reward
 
@@ -96,13 +92,17 @@ class DQNAgent:
         self.state = new_state
         if is_done:
             _score = self.score
-            max_tile = env.board.max()
+            max_tile = env.unwrapped.board.max()
+            move_count = env.unwrapped.legal_move_count
+            invalid_count = self.invalid_move_count
             self._reset()
-            return (_score, max_tile, env.legal_move_count, self.invalid_move_count)
+            return (_score, max_tile, move_count, invalid_count)
         return None  # score is not returned in the middle of an episode
 
 
 def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
+    # TODO: track average difference to test if converges at 
+
     states, actions, rewards, dones, next_states = batch
 
     states_v = torch.tensor(np.array(
@@ -112,6 +112,7 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
     actions_v = torch.tensor(actions).to(device)
     rewards_v = torch.tensor(rewards).to(device)
     done_mask = torch.BoolTensor(dones).to(device)
+    # TODO some spikes in the loss. make sure that the done mask is working
 
     state_action_values = net(states_v).gather(
         1, actions_v.unsqueeze(-1)).squeeze(-1)
@@ -122,13 +123,16 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
 
     expected_state_action_values = next_state_values * gamma + \
                                    rewards_v
-    return nn.MSELoss()(state_action_values,
+    loss = nn.MSELoss()(state_action_values,
                         expected_state_action_values)
+    frac_loss = (loss / expected_state_action_values.sum()).detach().item()
+    return loss, frac_loss
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--specs-file", default="specs/DQN-4x4.json")
+    #parser.add_argument("--specs-file", default="specs/DQN-4x4.json")
+    parser.add_argument("--specs-file", default="specs/DQN-2x3.json")
     parser.add_argument("--cuda", default=False,
                         action="store_true", help="Enable cuda")
     
@@ -159,7 +163,9 @@ if __name__ == "__main__":
     max_tiles = []
     episode_durations = []  # time in seconds
     move_counts = []  # steps
-    stats_period = 10  # 
+    frac_losses = []
+    losses = []
+    stats_period = 500  # 
 
     episode_idx = 0
     episode_start = time.time()
@@ -185,6 +191,9 @@ if __name__ == "__main__":
                 writer.add_scalar("mean episode duration", np.mean(episode_durations[-stats_period:]), episode_idx)
                 writer.add_scalar("mean move count", np.mean(move_counts[-stats_period:]), episode_idx)
 
+                writer.add_scalar("average fractional loss", np.mean(frac_losses[-stats_period:]), episode_idx)
+                writer.add_scalar("average loss", np.mean(losses[-stats_period:]), episode_idx)
+
             epsilon = max(specs['epsilon_final'], specs['epsilon_start'] -
                       episode_idx / specs['epsilon_decay_last_episode'])
             
@@ -194,7 +203,7 @@ if __name__ == "__main__":
                 invalid_counts = []
                 for i in range(specs['test_size']):
                     while True:
-                        res = agent.play_step(net, device=device)  # epsilon=0
+                        res = agent.play_step(net, testing=True, device=device)  # epsilon=0
                         # also get max tile and legality of move 
                         if res:
                             score, max_tile, move_count, invalid_move_count = res
@@ -207,16 +216,16 @@ if __name__ == "__main__":
                 m_max_tile = round(np.mean(test_max_tiles))
                 m_invalid_count = round(np.mean(invalid_counts))
                 print(f'Episode {episode_idx}: average score {m_test_score}, average max tile {m_max_tile}, average #invalid {m_invalid_count}')
-                writer.add_scalar("(greedy) Test Score", m_test_score, episode_idx)
-                writer.add_scalar("(greedy) Max tile", m_max_tile, episode_idx)
-                writer.add_scalar("(greedy) Average #invalid", m_invalid_count, episode_idx)
+                writer.add_scalar("greedy Test Score", m_test_score, episode_idx // specs['test_freq'])
+                writer.add_scalar("greedy Max tile", m_max_tile, episode_idx // specs['test_freq'])
+                writer.add_scalar("greedy Average number of invalid", m_invalid_count, episode_idx // specs['test_freq'])
             
-                if best_m_score is None or best_m_score < m_test_score:
-                    torch.save(net.state_dict(), "models/-best_%.0f.dat" % m_test_score)
-                    if best_m_score is not None:
-                        print("Best score updated %.3f -> %.3f" % (
-                            best_m_score, m_test_score))
-                    best_m_score = m_test_score
+                # if best_m_score is None or best_m_score < m_test_score:
+                #     torch.save(net.state_dict(), "models/-best_%.0f.dat" % m_test_score)
+                #     if best_m_score is not None:
+                #         print("Best score updated %.3f -> %.3f" % (
+                #             best_m_score, m_test_score))
+                #     best_m_score = m_test_score
 
             episode_idx += 1
 
@@ -230,8 +239,10 @@ if __name__ == "__main__":
 
         optimizer.zero_grad()
         batch = buffer.sample(specs['batch_size'])
-        loss_t = calc_loss(batch, net, tgt_net, specs['gamma'], device=device)
+        loss_t, frac_loss = calc_loss(batch, net, tgt_net, specs['gamma'], device=device)
         loss_t.backward()
+        losses.append(loss_t.detach())
+        frac_losses.append(frac_loss)
         optimizer.step()
 
     # writer.close()
