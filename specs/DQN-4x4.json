@@ -6,18 +6,20 @@
     "prob_2": 0.9,
     "max_tile": 2048,
 	
-    "epsilon_start": 1,
-    "epsilon_final": 0.01,
-    "epsilon_decay_last_episode": 20000,
+    "epsilon_start": 0.8,
+    "epsilon_final": 0.02,
+    "epsilon_decay_last_episode": 3000,
 
-    "learning_rate": 0.05,
-    "replay_size": 20000,
+    "learning_rate": 0.005,
+    "replay_size": 2000,
     "replay_start_size": 100,
     "batch_size": 16,
 
-    "gamma": 0.95,
+    "gamma": 0.7,
 
-    "sync_target_net_freq": 200,
+    "layer_size": 512,
+    "sync_target_net_freq": 1000,
+    
     "test_freq": 200,
     "test_size": 30
 }

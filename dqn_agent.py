@@ -13,6 +13,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+"""
+- Syncing the networks seems to cause a spike in the loss. Might look up ways to reduce this
+- Try with no or less exploration? Seems to actually converge when it's not learning based on random moves
+
+I wonder what the agent thinks about states that are actually lost, in the sense that can't move anywhere. They are never updated, because they don't get into experiences
+
+"""
 
 from tensorboardX import SummaryWriter
 
@@ -78,11 +85,10 @@ class DQNAgent:
             self.invalid_move_count += 1
 
         
-        if testing or epsilon==0:
-            # we don't want the agent to get stuck with an invalid move during testing (epsilon=0)
-            while not info['valid_move']:
-                action = env.action_space.sample()
-                new_state, reward, is_done, info = self.env.step(action)
+        # we don't want the agent to get stuck with an invalid move 
+        while not info['valid_move']:
+            action = env.action_space.sample()
+            new_state, reward, is_done, info = self.env.step(action)
 
         self.score += reward
 
@@ -91,6 +97,11 @@ class DQNAgent:
         self.exp_buffer.append(exp)
         self.state = new_state
         if is_done:
+            # Also add experiences that should decrease the value of any encountered terminal state
+            for a in range(env.action_space.n):
+                _exp = Experience(new_state, a, 0, True, new_state)
+                self.exp_buffer.append(_exp)
+
             _score = self.score
             max_tile = env.unwrapped.board.max()
             move_count = env.unwrapped.legal_move_count
@@ -137,6 +148,11 @@ if __name__ == "__main__":
                         action="store_true", help="Enable cuda")
     
     args = parser.parse_args()
+
+    # TEMP
+    agent_name = '2x3'
+    args.specs_file = f"specs/DQN-{agent_name}.json"
+
     device = torch.device("cuda" if args.cuda else "cpu")
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -147,11 +163,11 @@ if __name__ == "__main__":
     env = OnehotWrapper(env)
 
     maxval = log2[specs['max_tile']] + 1
-    net = DQN(maxval, specs['height'], specs['width'], 4).to(device)
-    tgt_net = DQN(maxval, specs['height'], specs['width'], 4).to(device)
+    net = DQN(maxval, specs['height'], specs['width'], specs['layer_size'], 4).to(device)
+    tgt_net = DQN(maxval, specs['height'], specs['width'], specs['layer_size'], 4).to(device)
     tgt_net.load_state_dict(net.state_dict())
     
-    writer = SummaryWriter(comment="-2048")
+    writer = SummaryWriter(comment=f"-{agent_name}")
     print(net)
 
     buffer = ExperienceBuffer(specs['replay_size'])
@@ -229,8 +245,14 @@ if __name__ == "__main__":
 
             episode_idx += 1
 
-            if episode_idx % specs['sync_target_net_freq'] == 0:
-                tgt_net.load_state_dict(net.state_dict())
+
+
+            # if episode_idx % specs['sync_target_net_freq'] == 0:
+            #     tgt_net.load_state_dict(net.state_dict())
+
+            
+            for target_param, param in zip(tgt_net.parameters(), net.parameters()):
+                target_param.data.copy_(target_param.data * (1.0 - specs['tau']) + param.data * specs['tau'])
             
 
         if len(buffer) < specs['replay_start_size']:
