@@ -223,8 +223,8 @@ class Env2048(gym.Env):
                 else:
                     # tiles can be combined
                     if self.board[target_row][col] == self.board[moving_row][col]:
-                        reward += self.board[target_row][col]
                         self.board[target_row][col] *= 2
+                        reward += self.board[target_row][col]
                         self.board[moving_row][col] = 0
                         target_row -= 1
                     # tiles can't be combined. slide moving tile down

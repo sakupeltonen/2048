@@ -18,7 +18,6 @@ import torch.optim as optim
 - Try with no or less exploration? Seems to actually converge when it's not learning based on random moves
 
 I wonder what the agent thinks about states that are actually lost, in the sense that can't move anywhere. They are never updated, because they don't get into experiences
-
 """
 
 from tensorboardX import SummaryWriter
@@ -141,8 +140,8 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
                                    rewards_v
     loss = nn.MSELoss()(state_action_values,
                         expected_state_action_values)
-    frac_loss = (loss / expected_state_action_values.sum()).detach().item()
-    return loss, frac_loss
+    
+    return loss
 
 
 if __name__ == "__main__":
@@ -155,7 +154,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # TEMP
-    agent_name = '2x3'
+    agent_name = '1x3'
     args.specs_file = f"specs/DQN-{agent_name}.json"
 
     device = torch.device("cuda" if args.cuda else "cpu")
@@ -184,7 +183,7 @@ if __name__ == "__main__":
     max_tiles = []
     episode_durations = []  # time in seconds
     move_counts = []  # steps
-    frac_losses = []
+    # frac_losses = []
     losses = []
     stats_period = 500  # 
 
@@ -209,10 +208,10 @@ if __name__ == "__main__":
                 writer.add_scalar("mean score", np.mean(scores[-stats_period:]), episode_idx)
                 writer.add_scalar("mean max tile", np.mean(max_tiles[-stats_period:]), episode_idx)
                 writer.add_scalar("epsilon", epsilon, episode_idx)
-                writer.add_scalar("mean episode duration", np.mean(episode_durations[-stats_period:]), episode_idx)
+                # writer.add_scalar("mean episode duration", np.mean(episode_durations[-stats_period:]), episode_idx)
                 writer.add_scalar("mean move count", np.mean(move_counts[-stats_period:]), episode_idx)
 
-                writer.add_scalar("average fractional loss", np.mean(frac_losses[-stats_period:]), episode_idx)
+                # writer.add_scalar("average fractional loss", np.mean(frac_losses[-stats_period:]), episode_idx)
                 writer.add_scalar("average loss", np.mean(losses[-stats_period:]), episode_idx)
 
             epsilon = max(specs['epsilon_final'], specs['epsilon_start'] -
@@ -241,6 +240,8 @@ if __name__ == "__main__":
                 writer.add_scalar("greedy Max tile", m_max_tile, episode_idx // specs['test_freq'])
                 writer.add_scalar("greedy Average number of invalid", m_invalid_count, episode_idx // specs['test_freq'])
             
+
+
                 # if best_m_score is None or best_m_score < m_test_score:
                 #     torch.save(net.state_dict(), "models/-best_%.0f.dat" % m_test_score)
                 #     if best_m_score is not None:
@@ -266,10 +267,10 @@ if __name__ == "__main__":
 
         optimizer.zero_grad()
         batch = buffer.sample(specs['batch_size'])
-        loss_t, frac_loss = calc_loss(batch, net, tgt_net, specs['gamma'], device=device)
+        loss_t = calc_loss(batch, net, tgt_net, specs['gamma'], device=device)
         loss_t.backward()
         losses.append(loss_t.detach())
-        frac_losses.append(frac_loss)
+        # frac_losses.append(frac_loss)
         optimizer.step()
 
     # writer.close()

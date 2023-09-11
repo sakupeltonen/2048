@@ -1,0 +1,26 @@
+{
+	"name": "1x2",
+
+    "width": 2,
+    "height": 1,
+    "prob_2": 1,
+    "max_tile": 8,
+	
+    "epsilon_start": 1,
+    "epsilon_final": 0.01,
+    "epsilon_decay_last_episode": 30000,
+
+    "learning_rate": 0.02,
+    "replay_size": 100,
+    "replay_start_size": 100,
+    "batch_size": 1,
+
+    "gamma": 0.5,
+
+    "layer_size": 32,
+    "tau": 0.01,
+    "sync_target_net_freq": 1000,
+    
+    "test_freq": 500,
+    "test_size": 200
+}

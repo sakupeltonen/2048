@@ -4,23 +4,22 @@
     "width": 4,
     "height": 4,
     "prob_2": 0.9,
-    "max_tile": 2048,
+    "max_tile": 8192,
 	
     "epsilon_start": 0.8,
     "epsilon_final": 0.02,
-    "epsilon_decay_last_episode": 3000,
+    "epsilon_decay_last_episode": 10000,
 
     "learning_rate": 0.005,
     "replay_size": 2000,
     "replay_start_size": 100,
-    "batch_size": 16,
+    "batch_size": 32,
 
     "gamma": 0.7,
 
     "layer_size": 512,
     "tau": 0.005,
-    "sync_target_net_freq": 1000,
 
-    "test_freq": 200,
+    "test_freq": 500,
     "test_size": 30
 }
