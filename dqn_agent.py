@@ -154,7 +154,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # TEMP
-    agent_name = '1x3'
+    agent_name = '4x4'
     args.specs_file = f"specs/DQN-{agent_name}.json"
 
     device = torch.device("cuda" if args.cuda else "cpu")

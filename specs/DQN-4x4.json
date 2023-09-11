@@ -13,7 +13,7 @@
     "learning_rate": 0.005,
     "replay_size": 2000,
     "replay_start_size": 100,
-    "batch_size": 32,
+    "batch_size": 16,
 
     "gamma": 0.7,
 
