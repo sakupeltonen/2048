@@ -128,4 +128,5 @@ def replay_game(path):
 
 
 human_play(width=4, height=4)
+
 # replay_game('games/testi.pkl')

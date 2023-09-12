@@ -212,7 +212,8 @@ if __name__ == "__main__":
                 writer.add_scalar("mean move count", np.mean(move_counts[-stats_period:]), episode_idx)
 
                 # writer.add_scalar("average fractional loss", np.mean(frac_losses[-stats_period:]), episode_idx)
-                writer.add_scalar("average loss", np.mean(losses[-stats_period:]), episode_idx)
+                avg_loss = torch.mean(torch.tensor(losses[-stats_period:]))
+                writer.add_scalar("average loss", avg_loss.item(), episode_idx)
 
             epsilon = max(specs['epsilon_final'], specs['epsilon_start'] -
                       episode_idx / specs['epsilon_decay_last_episode'])
