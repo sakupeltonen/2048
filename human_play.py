@@ -1,37 +1,35 @@
 import numpy as np
 import pygame as pg
 import json
-from enum import Enum
-import gymnasium as gym
 import os
 import pickle
 from environment import Env2048
-from greedy import GreedyAgent
 from tools import save_game
-
-np.random.seed(42)
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 constants_path = os.path.join(script_dir,'constants.json')
 constants = json.load(open(constants_path, "r"))
 
-direction_from_pg = {
-    pg.K_LEFT: 'left', 
-    pg.K_RIGHT: 'right',
-    pg.K_UP: 'up',
-    pg.K_DOWN: 'down'
-}
-
-
 
 def pg_main(width, height, initialize, handle_keypress):
+    """
+       Controller for pygame. Behavior is determined by the functions initialize and handle_keypress.
+    """
     pg.init()
-    screen = pg.display.set_mode((width * constants["boxsize"], height * constants["boxsize"]))
+    screen = pg.display.set_mode((width * constants["boxsize"], 
+                                  height * constants["boxsize"]))
     pg.display.set_caption("2048")
     pg_running = True
     terminated = False
 
     initialize(screen)
+
+    direction_from_pg = {
+        pg.K_LEFT: 'left', 
+        pg.K_RIGHT: 'right',
+        pg.K_UP: 'up',
+        pg.K_DOWN: 'down'
+    }
 
     while pg_running:
         direction = None
@@ -52,20 +50,12 @@ def pg_main(width, height, initialize, handle_keypress):
     pg.quit()
 
 
-
-
-
-
-
-def human_play(width=4, height=4, initial_state=None):
-    # env = Env2048(width=width, height=height, render_mode='human')
-    # _ = env.reset(custom_state=initial_state)
-
-    env = Env2048.initial_with_tile(1024, width=width, height=height, render_mode='human')
-    
+def human_play(width=4, height=4, initial_state=None, save_filename='testi'):
+    env = Env2048(width=width, height=height, render_mode='human')
+    _ = env.reset(custom_state=initial_state)
 
     history = [env.board.copy()]
-    game_score = 0  # TODO fix score not being updated, outside of the scope of handle_keypress
+    game_score = 0
 
     def initialize(screen):
         env.screen = screen
@@ -79,21 +69,26 @@ def human_play(width=4, height=4, initial_state=None):
         if not info['valid_move']:
             print(f'{direction} is not a valid move')
         else:
-            #score += reward
             history.append(board.copy())
             env.render()
             print(f'{direction} -- total score {game_score}')
-            env.render(mode='ansi')
+            #env.render(mode='ansi')
 
             if terminated:
                 print(f"Game over. Total score: {game_score}")
 
     pg_main(width, height, initialize, handle_keypress)
-    save_game(history, 'kek')
+    save_game(history, save_filename)
 
 
 
 def replay_game(path):
+    """
+       Replay a saved game. 
+       
+       Left/Right arrows go forwards/backwards by one step. 
+       Up/Down by 10 steps. 
+    """
     with open(path, 'rb') as file:
         history = pickle.load(file)
 
@@ -133,4 +128,4 @@ def replay_game(path):
 
 
 human_play(width=4, height=4)
-# replay_game('games/4x4-2048.pkl')
+# replay_game('games/testi.pkl')

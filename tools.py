@@ -4,10 +4,11 @@ import numpy as np
 
 def save_game(history, name):
     """
-       Parameters: TODO update
-       history ([np.array]): List of board states
-       name (string): Exact name of the file
-       base_name (string): Prefix of filename. Doesn't overwrite, instead saved as base_name{x} where x is the first free integer
+       Save a game history to a file
+    
+       Parameters:
+       history ([board]): List of game boards
+       name (string): File name
     """
     script_dir = os.path.dirname(os.path.abspath(__file__))
     filename = name + '.pkl'
