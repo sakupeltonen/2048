@@ -8,11 +8,11 @@
 	
     "epsilon_start": 0.8,
     "epsilon_final": 0.02,
-    "epsilon_decay_last_episode": 10000,
+    "epsilon_decay_last_episode": 100000,
 
     "learning_rate": 0.005,
-    "replay_size": 2000,
-    "replay_start_size": 100,
+    "replay_size": 3000,
+    "replay_start_size": 500,
     "batch_size": 16,
 
     "gamma": 0.7,
@@ -20,6 +20,6 @@
     "layer_size": 512,
     "tau": 0.005,
 
-    "test_freq": 500,
+    "test_freq": 1000,
     "test_size": 30
 }
