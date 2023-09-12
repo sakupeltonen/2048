@@ -189,7 +189,7 @@ if __name__ == "__main__":
 
     episode_idx = 0
     episode_start = time.time()
-    best_m_score = None
+    best_test_score = None
 
     while True:
         res = agent.play_step(net, epsilon, device=device)  # also get max tile (no legality of move since there are random moves)
@@ -241,14 +241,12 @@ if __name__ == "__main__":
                 writer.add_scalar("greedy Max tile", m_max_tile, episode_idx // specs['test_freq'])
                 writer.add_scalar("greedy Average number of invalid", m_invalid_count, episode_idx // specs['test_freq'])
             
-
-
-                # if best_m_score is None or best_m_score < m_test_score:
-                #     torch.save(net.state_dict(), "models/-best_%.0f.dat" % m_test_score)
-                #     if best_m_score is not None:
-                #         print("Best score updated %.3f -> %.3f" % (
-                #             best_m_score, m_test_score))
-                #     best_m_score = m_test_score
+                if best_test_score is None or best_test_score < m_test_score:
+                    torch.save(net.state_dict(), "models/-best_%.0f.dat" % m_test_score)
+                    if best_test_score is not None:
+                        print("Best score updated %.3f -> %.3f" % (
+                            best_test_score, m_test_score))
+                    best_test_score = m_test_score
 
             episode_idx += 1
 
