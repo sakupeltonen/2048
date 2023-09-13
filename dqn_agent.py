@@ -146,7 +146,7 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--agent-name", default="DQN-4x4.json")
+    parser.add_argument("--agent-name", default="DQN-4x4")
     parser.add_argument("--cuda", default=False,
                         action="store_true", help="Enable cuda")
     args = parser.parse_args()
