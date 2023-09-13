@@ -15,9 +15,9 @@
     "replay_start_size": 500,
     "batch_size": 16,
 
-    "gamma": 0.7,
+    "gamma": 0.95,
 
-    "layer_size": 512,
+    "layer_size": 256,
     "tau": 0.005,
 
     "test_freq": 1000,
