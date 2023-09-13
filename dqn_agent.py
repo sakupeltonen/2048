@@ -146,21 +146,18 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    #parser.add_argument("--specs-file", default="specs/DQN-4x4.json")
-    parser.add_argument("--specs-file", default="specs/DQN-2x3.json")
+    parser.add_argument("--agent-name", default="DQN-4x4.json")
     parser.add_argument("--cuda", default=False,
                         action="store_true", help="Enable cuda")
-    
     args = parser.parse_args()
 
-    # TEMP
-    agent_name = '4x4'
-    args.specs_file = f"specs/DQN-{agent_name}.json"
+    # args.agent_name = 'DQN-4x4'    
+    specs_file = f"specs/{args.agent_name}.json"
 
     device = torch.device("cuda" if args.cuda else "cpu")
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.join(script_dir, args.specs_file)
+    path = os.path.join(script_dir, specs_file)
     specs = json.load(open(path, "r"))
 
     env = Env2048(width=specs['width'], height=specs['height'], prob_2=specs['prob_2'], max_tile=specs['max_tile'])
@@ -171,7 +168,7 @@ if __name__ == "__main__":
     tgt_net = DQN(maxval, specs['height'], specs['width'], specs['layer_size'], 4).to(device)
     tgt_net.load_state_dict(net.state_dict())
     
-    writer = SummaryWriter(comment=f"-{agent_name}")
+    writer = SummaryWriter(comment=f"-{args.agent_name}")
     print(net)
 
     buffer = ExperienceBuffer(specs['replay_size'])

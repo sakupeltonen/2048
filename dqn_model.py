@@ -14,6 +14,12 @@ class DQN(nn.Module):
             nn.ReLU(),
             nn.Linear(layer_size, layer_size),
             nn.ReLU(),
+            nn.Linear(layer_size, layer_size//2),
+            nn.ReLU(),
+            nn.Linear(layer_size//2, layer_size),
+            nn.ReLU(),
+            nn.Linear(layer_size, layer_size),
+            nn.ReLU(),
             nn.Linear(layer_size, n_actions)
         )
         # no non-linearity on the last layer, because q values can be anything
