@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from dqn_model import DQN
 from environment import Env2048, OnehotWrapper, log2
+from experience_replay import ExperienceBuffer
 
 import argparse
 import time
@@ -8,17 +9,11 @@ import numpy as np
 import collections
 import os
 import json
+import math
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
-"""
-- Syncing the networks seems to cause a spike in the loss. Might look up ways to reduce this
-- Try with no or less exploration? Seems to actually converge when it's not learning based on random moves
-
-I wonder what the agent thinks about states that are actually lost, in the sense that can't move anywhere. They are never updated, because they don't get into experiences
-"""
 
 from tensorboardX import SummaryWriter
 
@@ -26,28 +21,6 @@ from tensorboardX import SummaryWriter
 Experience = collections.namedtuple(
     'Experience', field_names=['state', 'action', 'reward',
                                'done', 'new_state'])
-
-
-
-class ExperienceBuffer:
-    def __init__(self, capacity):
-        self.buffer = collections.deque(maxlen=capacity)
-
-    def __len__(self):
-        return len(self.buffer)
-
-    def append(self, experience):
-        self.buffer.append(experience)
-
-    def sample(self, batch_size):
-        indices = np.random.choice(len(self.buffer), batch_size,
-                                   replace=False)
-        states, actions, rewards, dones, next_states = \
-            zip(*[self.buffer[idx] for idx in indices])
-        return np.array(states), np.array(actions), \
-               np.array(rewards, dtype=np.float32), \
-               np.array(dones, dtype=np.uint8), \
-               np.array(next_states)
 
 
 class DQNAgent:
@@ -62,18 +35,23 @@ class DQNAgent:
         self.invalid_move_count = 0
 
     @torch.no_grad()
+    def _evaluate(self, net, state, device='cpu'):
+        """get Q values and maximizing action for a given state"""
+        state_a = np.array([state], copy=False)
+        state_v = torch.tensor(state_a).to(device)  # TODO is the device thing necessary
+        q_vals = net(state_v)
+        _, act_v = torch.max(q_vals, dim=1)
+        action = int(act_v.item())
+        return q_vals, action
+
+    @torch.no_grad()
     def play_step(self, net, epsilon=0.0, testing=False, device="cpu"):
         # note : nothing prevents from taking moves that don't actually change the board. 
         # the agent should learn to not do this but make sure
         if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
-            state_a = np.array([self.state], copy=False)
-            state_v = torch.tensor(state_a).to(device)
-            q_vals_v = net(state_v)
-            _, act_v = torch.max(q_vals_v, dim=1)
-            action = int(act_v.item())
-            
+            _, action = self._evaluate(net, self.state, device=device)
 
         # do step in the environment
         new_state, reward, is_done, info = self.env.step(action)
@@ -93,13 +71,24 @@ class DQNAgent:
 
         exp = Experience(self.state, action, reward,
                          is_done, new_state)
-        self.exp_buffer.append(exp)
+
+        # Compute priority. TODO clean up
+        q_vals1, _ = self._evaluate(net, self.state, device=device)
+        q_vals2, greedy_a2 = self._evaluate(net, new_state, device=device)
+        delta = reward + q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
+        priority = max(1, abs(delta))
+
+        self.exp_buffer.append(exp, priority=priority) 
         self.state = new_state
         if is_done:
             # Also add experiences that should decrease the value of any encountered terminal state
+            q_vals, _ = self._evaluate(net, self.state, device=device)
+            
             for a in range(env.action_space.n):
                 _exp = Experience(new_state, a, 0, True, new_state)
-                self.exp_buffer.append(_exp)
+
+                priority = max(1, q_vals[0][a].item())
+                self.exp_buffer.append(_exp, priority=priority)
 
             _score = self.score
             max_tile = env.unwrapped.board.max()
@@ -151,7 +140,7 @@ if __name__ == "__main__":
                         action="store_true", help="Enable cuda")
     args = parser.parse_args()
 
-    # args.agent_name = 'DQN-4x4'    
+    args.agent_name = 'DQN-3x3'    
     specs_file = f"specs/{args.agent_name}.json"
 
     device = torch.device("cuda" if args.cuda else "cpu")
