@@ -26,7 +26,7 @@ class OnehotWrapper(gym.ObservationWrapper):
     def to_onehot(self):
         n = log2[self.env.max_tile] + 1
         onehot = np.zeros((*self.env.board.shape, n), dtype=np.bool_)
-
+        # TODO instead have board as an argument, so that we can apply it to the afterstate observation
         rows, cols = np.indices(self.env.board.shape)
         log_board = np.vectorize(log2.get)(self.env.board)
         onehot[rows, cols, log_board] = 1
@@ -43,20 +43,22 @@ class OnehotWrapper(gym.ObservationWrapper):
         
 
 class AfterstateWrapper(gym.ObservationWrapper):
+    """Add an observation for the board resulting from a move, before spawning a random tile.
+    This should be applied BEFORE one-hot wrapper"""
     def __init__(self, env):
         super(AfterstateWrapper, self).__init__(env) 
 
-    # TODO not sure if want to do something with the intial state, where two tiles are spawned
+    def step(self, move):
+        board, reward, _, info = self.env.step(move, generate=False)
+        afterstate = board.copy()
 
-    def step(self, move, **kwargs):
-        _board, reward, done, info = self.env.step(move, **kwargs)
-        board_copy = _board.copy()
         if info['valid_move']:
-            c = info['spawn_location']
-            board_copy[c[0]][c[1]] = 0
+            self.env._place_random_tile()
         
-        # TODO should also return the final result
-        return board_copy, reward, done, info
+        done = self.env.is_done()
+        info['afterstate'] = afterstate
+
+        return self.env.board, reward, done, info
 
 
 class Env2048(gym.Env):
