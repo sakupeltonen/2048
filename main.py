@@ -50,7 +50,7 @@ if __name__ == "__main__":
                         action="store_true", help="Enable cuda")
     args = parser.parse_args()
 
-    args.agent_name = 'DQN-1x3'    
+    # args.agent_name = 'DQN-1x3'    
     specs_file = f"specs/{args.agent_name}.json"
 
     device = torch.device("cuda" if args.cuda else "cpu")
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     best_test_score = None
 
     while True:
-        res = agent.play_step(net, epsilon, device=device)
+        res = agent.play_step(net, epsilon)
 
         # End of an episode
         if res is not None:  
@@ -129,7 +129,7 @@ if __name__ == "__main__":
                 for i in range(specs['test_size']):
                     # Play a game with epsilon=0
                     while True:
-                        res = agent.play_step(net, device=device)
+                        res = agent.play_step(net)
                         if res:
                             score, max_tile, move_count, invalid_move_count = res
                             test_scores.append(score)
