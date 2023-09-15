@@ -59,23 +59,23 @@ class DQNAgent:
         exp = Experience(self.state, action, reward,
                          is_done, new_state)
 
-        # Compute priority. TODO clean up
+        # Compute priority. TODO clean up. TODO take is_done into account
         q_vals1, _ = self._evaluate(net, self.state)
         q_vals2, greedy_a2 = self._evaluate(net, new_state)
-        delta = reward + q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
+        delta = reward + (1-is_done) * q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
         priority = max(1, abs(delta))
 
         self.exp_buffer.append(exp, priority=priority) 
         self.state = new_state
         if is_done:
-            # Also add experiences that should decrease the value of any encountered terminal state
-            q_vals, _ = self._evaluate(net, self.state)
+            # Also add experiences that should decrease the value of any encountered terminal state. Probably unnecessary, possibly wrong
+            # q_vals, _ = self._evaluate(net, self.state)
             
-            for a in range(self.env.action_space.n):
-                _exp = Experience(new_state, a, 0, True, new_state)
+            # for a in range(self.env.action_space.n):
+            #     _exp = Experience(new_state, a, 0, True, new_state)
 
-                priority = max(1, q_vals[0][a].item())
-                self.exp_buffer.append(_exp, priority=priority)
+            #     priority = max(1, q_vals[0][a].item())
+            #     self.exp_buffer.append(_exp, priority=priority)
 
             _score = self.score
             max_tile = self.env.unwrapped.board.max()

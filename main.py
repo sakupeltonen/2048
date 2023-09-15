@@ -50,7 +50,6 @@ if __name__ == "__main__":
                         action="store_true", help="Enable cuda")
     args = parser.parse_args()
 
-    # args.agent_name = 'DQN-1x3'    
     specs_file = f"specs/{args.agent_name}.json"
 
     device = torch.device("cuda" if args.cuda else "cpu")
