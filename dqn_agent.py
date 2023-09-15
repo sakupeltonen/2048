@@ -10,34 +10,35 @@ Experience = collections.namedtuple(
 
 
 class DQNAgent:
-    def __init__(self, env, exp_buffer):
+    def __init__(self, env, exp_buffer, device='cpu'):
         self.env = env
         self.exp_buffer = exp_buffer
+        self.device = device
         self._reset()
 
     def _reset(self):
-        self.state = self.env.reset()  # TODO check
+        self.state = self.env.reset()
         self.score = 0.0
         self.invalid_move_count = 0
 
     @torch.no_grad()
-    def _evaluate(self, net, state, device='cpu'):
+    def _evaluate(self, net, state):
         """get Q values and maximizing action for a given state"""
         state_a = np.array([state], copy=False)
-        state_v = torch.tensor(state_a).to(device)  # TODO is the device thing necessary
+        state_v = torch.tensor(state_a).to(self.device)
         q_vals = net(state_v)
         _, act_v = torch.max(q_vals, dim=1)
         action = int(act_v.item())
         return q_vals, action
 
     @torch.no_grad()
-    def play_step(self, net, epsilon=0.0, device="cpu"):
+    def play_step(self, net, epsilon=0.0):
         # note : nothing prevents from taking moves that don't actually change the board. 
         # the agent should learn to not do this but make sure
         if np.random.random() < epsilon:
             action = self.env.action_space.sample()
         else:
-            _, action = self._evaluate(net, self.state, device=device)
+            _, action = self._evaluate(net, self.state)
 
         # do step in the environment
         new_state, reward, is_done, info = self.env.step(action)
@@ -59,8 +60,8 @@ class DQNAgent:
                          is_done, new_state)
 
         # Compute priority. TODO clean up
-        q_vals1, _ = self._evaluate(net, self.state, device=device)
-        q_vals2, greedy_a2 = self._evaluate(net, new_state, device=device)
+        q_vals1, _ = self._evaluate(net, self.state)
+        q_vals2, greedy_a2 = self._evaluate(net, new_state)
         delta = reward + q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
         priority = max(1, abs(delta))
 
@@ -68,7 +69,7 @@ class DQNAgent:
         self.state = new_state
         if is_done:
             # Also add experiences that should decrease the value of any encountered terminal state
-            q_vals, _ = self._evaluate(net, self.state, device=device)
+            q_vals, _ = self._evaluate(net, self.state)
             
             for a in range(self.env.action_space.n):
                 _exp = Experience(new_state, a, 0, True, new_state)
