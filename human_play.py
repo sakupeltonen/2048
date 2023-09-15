@@ -1,4 +1,4 @@
-import numpy as np
+import argparse
 import pygame as pg
 import json
 import os
@@ -50,8 +50,8 @@ def pg_main(width, height, initialize, handle_keypress):
     pg.quit()
 
 
-def human_play(width=4, height=4, initial_state=None, save_filename='testi'):
-    env = Env2048(width=width, height=height, render_mode='human')
+def human_play(width=4, height=4, prob_2=0.9, initial_state=None, filename=None):
+    env = Env2048(width=width, height=height, prob_2=prob_2, render_mode='human')
     _ = env.reset(custom_state=initial_state)
 
     history = [env.board.copy()]
@@ -78,7 +78,8 @@ def human_play(width=4, height=4, initial_state=None, save_filename='testi'):
                 print(f"Game over. Total score: {game_score}")
 
     pg_main(width, height, initialize, handle_keypress)
-    save_game(history, save_filename)
+    if filename:
+        save_game(history, filename)
 
 
 
@@ -127,6 +128,15 @@ def replay_game(path):
     pg_main(width, height, initialize, handle_keypress)
 
 
-human_play(width=4, height=4)
 
-# replay_game('games/testi.pkl')
+# replay_game('games/testi.pkl')  # TODO implement
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--width", default=4, type=int)
+    parser.add_argument("--height", default=4, type=int)
+    parser.add_argument("--prob-2", default=0.9, type=float)
+    parser.add_argument("--save", default=None, type=str)
+    args = parser.parse_args()
+
+    human_play(width=args.width, height=args.height, prob_2=args.prob_2, filename=args.save)
