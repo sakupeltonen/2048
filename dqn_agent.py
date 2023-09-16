@@ -17,9 +17,9 @@ class DQNAgent:
         self._reset()
 
     def _reset(self):
-        self.state = self.env.reset()
+        self.state = self.env.reset()[0]
         self.score = 0.0
-        self.invalid_move_count = 0
+        self.move_count = 0
 
     @torch.no_grad()
     def _evaluate(self, net, state):
@@ -33,6 +33,8 @@ class DQNAgent:
 
     @torch.no_grad()
     def play_step(self, net, epsilon=0.0):
+        # TODO get a list of valid moves. could also see if that is difficult to learn
+
         # note : nothing prevents from taking moves that don't actually change the board. 
         # the agent should learn to not do this but make sure
         if np.random.random() < epsilon:
@@ -40,21 +42,20 @@ class DQNAgent:
         else:
             _, action = self._evaluate(net, self.state)
 
+        old_state = self.env.unwrapped.s
         # do step in the environment
-        new_state, reward, is_done, info = self.env.step(action)
+        new_state, reward, is_done, _, info = self.env.step(action)
 
-        # keep track of invalid moves for testing purposes
-        # (random moves may well be invalid)
-        if not info['valid_move']: 
-            self.invalid_move_count += 1
-
-        
-        # we don't want the agent to get stuck with an invalid move 
-        while not info['valid_move']:
+        while new_state[old_state]:  # while hasn't moved. looks odd because we didn't wrap the old state to one-hot
             action = self.env.action_space.sample()
-            new_state, reward, is_done, info = self.env.step(action)
+            new_state, reward, is_done, _, info = self.env.step(action)
+
+        # TEMP: punish losing
+        # if reward == 0 and is_done:
+        #     reward = -1
 
         self.score += reward
+        self.move_count += 1
 
         exp = Experience(self.state, action, reward,
                          is_done, new_state)
@@ -62,25 +63,18 @@ class DQNAgent:
         # Compute priority. TODO clean up. TODO take is_done into account
         q_vals1, _ = self._evaluate(net, self.state)
         q_vals2, greedy_a2 = self._evaluate(net, new_state)
+        # delta = reward + gamma * (1-is_done) * q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
         delta = reward + (1-is_done) * q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
+        # TODO gamma should be a factor. make sure the is_done mask is correct
         priority = max(1, abs(delta))
+
+        # priority = 1
 
         self.exp_buffer.append(exp, priority=priority) 
         self.state = new_state
         if is_done:
-            # Also add experiences that should decrease the value of any encountered terminal state. Probably unnecessary, possibly wrong
-            # q_vals, _ = self._evaluate(net, self.state)
-            
-            # for a in range(self.env.action_space.n):
-            #     _exp = Experience(new_state, a, 0, True, new_state)
-
-            #     priority = max(1, q_vals[0][a].item())
-            #     self.exp_buffer.append(_exp, priority=priority)
-
             _score = self.score
-            max_tile = self.env.unwrapped.board.max()
-            move_count = self.env.unwrapped.legal_move_count
-            invalid_count = self.invalid_move_count
+            _move_count = self.move_count
             self._reset()
-            return (_score, max_tile, move_count, invalid_count)
+            return _score, _move_count
         return None  # score is not returned in the middle of an episode

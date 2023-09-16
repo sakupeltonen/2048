@@ -10,17 +10,16 @@ class DQN(nn.Module):
         self.input_features = max_val * board_height * board_width
 
         self.fc = nn.Sequential(
-            nn.Linear(self.input_features, layer_size),
-            nn.ReLU(),
-            nn.Linear(layer_size, layer_size),
-            nn.ReLU(),
-            nn.Linear(layer_size, layer_size//2),
-            nn.ReLU(),
-            nn.Linear(layer_size//2, layer_size),
-            nn.ReLU(),
-            nn.Linear(layer_size, layer_size),
-            nn.ReLU(),
-            nn.Linear(layer_size, n_actions)
+            # nn.Linear(self.input_features, layer_size),
+            # nn.ReLU(),
+            # nn.Linear(layer_size, layer_size),
+            # nn.ReLU(),
+            # nn.Linear(layer_size, layer_size),
+            # nn.ReLU(),
+            # nn.Linear(layer_size, layer_size),
+            # nn.ReLU(),
+            # nn.Linear(layer_size, n_actions)
+            nn.Linear(self.input_features, n_actions)
         )
         # no non-linearity on the last layer, because q values can be anything
         # TODO add more layers?

@@ -24,22 +24,19 @@ class OnehotWrapper(gym.ObservationWrapper):
         super(OnehotWrapper, self).__init__(env)
     
     def to_onehot(self):
-        n = log2[self.env.max_tile] + 1
-        onehot = np.zeros((*self.env.board.shape, n), dtype=np.bool_)
+        onehot = np.zeros((self.env.unwrapped.nrow * self.env.unwrapped.ncol), dtype=np.bool_)
         # TODO instead have board as an argument, so that we can apply it to the afterstate observation
-        rows, cols = np.indices(self.env.board.shape)
-        log_board = np.vectorize(log2.get)(self.env.board)
-        onehot[rows, cols, log_board] = 1
+        onehot[self.env.unwrapped.s] = 1
         return onehot
     
     def reset(self, **kwargs):
-        _ = self.env.reset(**kwargs)
-        return self.to_onehot()
+        res = self.env.reset(**kwargs)
+        return self.to_onehot(), res[1]
     
     def step(self, move, **kwargs):
-        _, reward, done, info = self.env.step(move, **kwargs)
+        _, reward, done, kek, info = self.env.step(move, **kwargs)
         _board = self.to_onehot()
-        return _board, reward, done, info
+        return _board, reward, done, kek, info
         
 
 class AfterstateWrapper(gym.ObservationWrapper):
