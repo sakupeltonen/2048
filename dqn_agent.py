@@ -31,7 +31,7 @@ class DQNAgent:
         return q_vals, action
 
     @torch.no_grad()
-    def play_step(self, net, epsilon=0.0):
+    def play_step(self, net, max_moves, epsilon=0.0):
         # TODO get a list of valid moves. could also see if that is difficult to learn
 
         # note : nothing prevents from taking moves that don't actually change the board. 
@@ -56,6 +56,8 @@ class DQNAgent:
         self.score += reward
         self.move_count += 1
 
+        
+
         exp = Experience(self.state, action, reward,
                          is_done, new_state)
 
@@ -70,6 +72,11 @@ class DQNAgent:
         # priority = 1
 
         self.exp_buffer.append(exp, priority=priority) 
+        
+        # TEMP: end overly long / stuck episodes early
+        if self.move_count > max_moves:
+            is_done = True
+
         self.state = new_state
         if is_done:
             _score = self.score

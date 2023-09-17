@@ -31,12 +31,12 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
 
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
     with torch.no_grad():
-        next_state_values = tgt_net(next_states_v).max(1)[0]
+        # next_state_values = tgt_net(next_states_v).max(1)[0]
 
         # Double Q-learning 
-        # next_state_actions = net(next_states_v).max(1)[1]
-        # next_state_values = tgt_net(next_states_v).gather(1, 
-        # next_state_actions.unsqueeze(-1)).squeeze(-1)
+        next_state_actions = net(next_states_v).max(1)[1]
+        next_state_values = tgt_net(next_states_v).gather(1, 
+        next_state_actions.unsqueeze(-1)).squeeze(-1)
         
         
         next_state_values[done_mask] = 0.0
@@ -86,41 +86,26 @@ if __name__ == "__main__":
     epsilon = specs['epsilon_start']
     optimizer = optim.Adam(net.parameters(), lr=specs['learning_rate'])
 
-    scores = []
-    max_tiles = []
-    episode_durations = []  # time in seconds
-    move_counts = []  # steps
-    losses = []
-    stats_period = 500  # logged statistics averaged over stats_period
-
+    step_idx = 0
     episode_idx = 0
     episode_start = time.time()
     best_test_score = None
 
     while True:
-        res = agent.play_step(net, epsilon=epsilon)  # FIX in main. epsilon is somehow passed even though keyword 
+        res = agent.play_step(net, specs['max_moves'], epsilon=epsilon)  # TODO FIX in main. epsilon is somehow passed even though keyword 
         
 
         # End of an episode
         if res is not None:  
             score, move_count = res
 
-            # TODO simplify logging
-            scores.append(score)
-            move_counts.append(move_count)
-            
             # Time episode
             episode_duration = time.time() - episode_start
             episode_start = time.time()
-            episode_durations.append(episode_duration)
 
             # Log average of statistics
-            if episode_idx >= stats_period:
-                writer.add_scalar("mean score", np.mean(scores[-stats_period:]), episode_idx)
-                writer.add_scalar("epsilon", epsilon, episode_idx)
-                writer.add_scalar("mean move count", np.mean(move_counts[-stats_period:]), episode_idx)
-                avg_loss = torch.mean(torch.tensor(losses[-stats_period:]))
-                writer.add_scalar("average loss", avg_loss.item(), episode_idx)
+            writer.add_scalar("score", score, episode_idx)
+            writer.add_scalar("epsilon", epsilon, episode_idx)
 
             # Update epsilon
             epsilon = max(specs['epsilon_final'], specs['epsilon_start'] -
@@ -132,19 +117,18 @@ if __name__ == "__main__":
                 for i in range(specs['test_size']):
                     # Play a game with epsilon=0
                     while True:
-                        res = agent.play_step(net)
+                        res = agent.play_step(net, specs['max_moves'])
                         if res:
                             score, move_count = res
                             test_scores.append(score)
+                            writer.add_scalar("greedy score", score, episode_idx + i)  
                             break
                 
                 # Print and log test statistics
                 m_test_score = np.mean(test_scores)
-
                 print(f'Episode {episode_idx}: average score {m_test_score:.2f}')
-                writer.add_scalar("greedy Test Score", 
-                                  m_test_score, episode_idx // specs['test_freq'])
-                
+
+            if episode_idx % specs['viz_freq'] == 0:
                 current_time = datetime.now().strftime("%d%m-%H%M")
                 visualize_qval(net.fc[0], width, height, title=f'{args.agent_name}-{current_time}-{episode_idx}')
             
@@ -168,6 +152,7 @@ if __name__ == "__main__":
             target_param.data.copy_(target_param.data * (1.0 - specs['tau']) + \
                                         param.data * specs['tau'])
 
+        step_idx += 1
         if len(buffer) < specs['replay_start_size']:
             continue
 
@@ -175,5 +160,7 @@ if __name__ == "__main__":
         batch = buffer.sample(specs['batch_size'])
         loss_t = calc_loss(batch, net, tgt_net, specs['gamma'], device=device)
         loss_t.backward()
-        losses.append(loss_t.detach())
+        writer.add_scalar("average loss", loss_t.detach().item(), step_idx)
         optimizer.step()
+
+        
