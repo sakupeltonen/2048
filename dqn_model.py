@@ -4,7 +4,7 @@ import numpy as np
 
 
 class DQN(nn.Module):
-    def __init__(self, max_val, board_height, board_width, layer_size, n_actions):
+    def __init__(self, max_val, board_height, board_width, n_actions):
         super(DQN, self).__init__()
 
         self.input_features = max_val * board_height * board_width

@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import gymnasium as gym
+from datetime import datetime
 
 from experience_replay import ExperienceBuffer
 from dqn_model import DQN
@@ -72,10 +73,8 @@ if __name__ == "__main__":
     maxval = 1
     num_actions = 4
 
-    net = DQN(maxval, height, 
-              width, specs['layer_size'], num_actions).to(device)
-    tgt_net = DQN(maxval, height, 
-                  width, specs['layer_size'], num_actions).to(device)
+    net = DQN(maxval, height, width, num_actions).to(device)
+    tgt_net = DQN(maxval, height, width, num_actions).to(device)
     tgt_net.load_state_dict(net.state_dict())
     
     writer = SummaryWriter(comment=f"-{args.agent_name}")
@@ -106,6 +105,7 @@ if __name__ == "__main__":
         if res is not None:  
             score, move_count = res
 
+            # TODO simplify logging
             scores.append(score)
             move_counts.append(move_count)
             
@@ -126,7 +126,7 @@ if __name__ == "__main__":
             epsilon = max(specs['epsilon_final'], specs['epsilon_start'] -
                       episode_idx / specs['epsilon_decay_last_episode'])
             
-            # Testing
+            # Testing  # TODO agent can theoretically get stuck in cycles
             if episode_idx % specs['test_freq'] == 0:
                 test_scores = []
                 for i in range(specs['test_size']):
@@ -145,7 +145,8 @@ if __name__ == "__main__":
                 writer.add_scalar("greedy Test Score", 
                                   m_test_score, episode_idx // specs['test_freq'])
                 
-                visualize_qval(net.fc[0], width, height, title=f'{episode_idx}')
+                current_time = datetime.now().strftime("%d%m-%H%M")
+                visualize_qval(net.fc[0], width, height, title=f'{args.agent_name}-{current_time}-{episode_idx}')
             
                 # Save improved model
                 # if best_test_score is None or best_test_score < m_test_score:
@@ -157,13 +158,15 @@ if __name__ == "__main__":
 
             episode_idx += 1
 
-            # Update target net parameters
-            for target_param, param in zip(tgt_net.parameters(), net.parameters()):
-                target_param.data.copy_(target_param.data * (1.0 - specs['tau']) + \
-                                         param.data * specs['tau'])
+            
             # if episode_idx % specs['sync_target_net_freq'] == 0:
             #     tgt_net.load_state_dict(net.state_dict())
-            
+        
+        # Update target net parameters  
+        # # TODO move updating outside of end of episode loop in master
+        for target_param, param in zip(tgt_net.parameters(), net.parameters()):
+            target_param.data.copy_(target_param.data * (1.0 - specs['tau']) + \
+                                        param.data * specs['tau'])
 
         if len(buffer) < specs['replay_start_size']:
             continue

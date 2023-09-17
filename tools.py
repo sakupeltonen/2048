@@ -86,6 +86,7 @@ def visualize_qval(net, width, height, title=None):
     if title:
         fig.suptitle(title)
         fig.savefig("plots/" + title + ".jpg", dpi=300)
+        plt.close(fig)
     else:
         plt.show()
 
