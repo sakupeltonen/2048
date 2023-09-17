@@ -3,7 +3,6 @@ import numpy as np
 import collections
 import torch
 
-
 Experience = collections.namedtuple(
     'Experience', field_names=['state', 'action', 'reward',
                                'done', 'new_state'])

@@ -19,7 +19,7 @@ class DQN(nn.Module):
             # nn.Linear(layer_size, layer_size),
             # nn.ReLU(),
             # nn.Linear(layer_size, n_actions)
-            nn.Linear(self.input_features, n_actions)
+            nn.Linear(self.input_features, n_actions, bias=False)
         )
         # no non-linearity on the last layer, because q values can be anything
         # TODO add more layers?

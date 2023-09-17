@@ -1,6 +1,8 @@
 import os
 import pickle
 import numpy as np
+import matplotlib.pyplot as plt
+import torch.nn as nn
 
 def save_game(history, name):
     """
@@ -47,3 +49,40 @@ def generate_all_boards(w, h, vals):
     
     lists = _generate_all([])
     return [np.array(l).reshape((h,w)) for l in lists]
+
+
+def visualize_qval(net, width, height, title=None):
+    """Plot Q-values in a grid shaped like the game board"""
+
+    fig, axs = plt.subplots(height, width, figsize=(10, 10))
+    
+    for i in range(height):
+        for j in range(width):
+            # Get the index for the input neuron
+            neuron_index = i*width + j
+            # Extract the weights for the 4 outputs corresponding to the current input neuron
+            weights = net.weight[:, neuron_index].detach().numpy()
+            
+            # Plot the weights as numbers near the four sides of each cell
+            axs[i, j].text(0.5, 1.1, f"{weights[3]:.2f}", ha='center', va='center', transform=axs[i, j].transAxes)
+            axs[i, j].text(0.5, -0.1, f"{weights[1]:.2f}", ha='center', va='center', transform=axs[i, j].transAxes)
+            axs[i, j].text(-0.1, 0.5, f"{weights[0]:.2f}", ha='center', va='center', transform=axs[i, j].transAxes)
+            axs[i, j].text(1.1, 0.5, f"{weights[2]:.2f}", ha='center', va='center', transform=axs[i, j].transAxes)
+
+        #     pg.K_LEFT: 0, 
+        # pg.K_RIGHT: 2,
+        # pg.K_UP: 3,
+        # pg.K_DOWN: 1
+
+            axs[i, j].set_xticks([0, 1])
+            axs[i, j].set_yticks([0, 1])
+            axs[i, j].grid(True)
+
+            # Turn off the ticks and labels while leaving the grid visible
+            axs[i, j].tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+    
+    if title:
+        fig.suptitle(title)
+
+    plt.tight_layout()
+    plt.show()

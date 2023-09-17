@@ -1,0 +1,22 @@
+{
+    "desc": ["SH", "FG"],
+    "height": 2,
+    "width": 2,
+	
+    "epsilon_start": 0.8,
+    "epsilon_final": 0.02,
+    "epsilon_decay_last_episode": 10000,
+
+    "learning_rate": 0.02,
+    "replay_size": 3000,
+    "replay_start_size": 100,
+    "batch_size": 16,
+
+    "gamma": 0.95,
+
+    "layer_size": 64,
+    "tau": 0.005,
+
+    "test_freq": 300,
+    "test_size": 50
+}
