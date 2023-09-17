@@ -81,8 +81,13 @@ def visualize_qval(net, width, height, title=None):
             # Turn off the ticks and labels while leaving the grid visible
             axs[i, j].tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
     
+    plt.tight_layout()
+
     if title:
         fig.suptitle(title)
+        fig.savefig("plots/" + title + ".jpg", dpi=300)
+    else:
+        plt.show()
 
-    plt.tight_layout()
-    plt.show()
+    
+    

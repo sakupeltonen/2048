@@ -62,7 +62,7 @@ if __name__ == "__main__":
     path = os.path.join(script_dir, specs_file)
     specs = json.load(open(path, "r"))
 
-    desc = ['SFFH','FFFF', 'FFFF','HFFG']
+    desc = specs['desc']
     # with this map, perfect winrate is possible
     width = len(desc[0])
     height = len(desc)

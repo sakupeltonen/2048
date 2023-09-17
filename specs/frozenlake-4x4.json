@@ -1,7 +1,5 @@
 {
-    "desc": ["SH", "FG"],
-    "height": 2,
-    "width": 2,
+    "desc": ["SFFH","FFFF", "FFFF","HFFG"],
 	
     "epsilon_start": 0.8,
     "epsilon_final": 0.02,
