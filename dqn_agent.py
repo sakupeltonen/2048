@@ -45,9 +45,10 @@ class DQNAgent:
         # do step in the environment
         new_state, reward, is_done, _, info = self.env.step(action)
 
-        while new_state[old_state]:  # while hasn't moved. looks odd because we didn't wrap the old state to one-hot
-            action = self.env.action_space.sample()
-            new_state, reward, is_done, _, info = self.env.step(action)
+        # // For frozenlake, this is actually bad and prevents perfect strategies: can't move back safely
+        # while new_state[old_state]:  # while hasn't moved. looks odd because we didn't wrap the old state to one-hot
+        #     action = self.env.action_space.sample()
+        #     new_state, reward, is_done, _, info = self.env.step(action)
 
         # TEMP: punish losing
         # if reward == 0 and is_done:
