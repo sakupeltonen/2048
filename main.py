@@ -27,17 +27,16 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
 
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
     with torch.no_grad():
-        # TODO Double Q-learning
+        # Q-learning
+        # next_q_values = net(next_states_v)
+        # next_q_values[~next_valid_moves_v] = float('-inf')
+        # next_state_values = next_q_values.max(1)[0]
+
+        # Double Q-learning # TODO check
         next_q_values = net(next_states_v)
         next_q_values[~next_valid_moves_v] = float('-inf')
-        next_state_values = next_q_values.max(1)[0]
-
-        # next_state_values = tgt_net(next_states_v).gather(1, next_state_actions.unsqueeze(-1)).squeeze(-1)
-
-        # Double Q-learning  # TODO add mask for valid moves
-        # next_state_actions = net(next_states_v).max(1)[1]
-        # next_state_values = tgt_net(next_states_v).gather(1, 
-        # next_state_actions.unsqueeze(-1)).squeeze(-1)
+        next_state_actions = next_q_values.max(1)[1]
+        next_state_values = tgt_net(next_states_v).gather(1, next_state_actions.unsqueeze(-1)).squeeze(-1)
         
         
         next_state_values[done_mask] = 0.0
