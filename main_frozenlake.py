@@ -130,7 +130,7 @@ if __name__ == "__main__":
 
             if episode_idx % specs['viz_freq'] == 0:
                 current_time = datetime.now().strftime("%d%m-%H%M")
-                visualize_qval(net.fc[0], width, height, title=f'{args.agent_name}-{current_time}-{episode_idx}')
+                visualize_qval(net.fc[0], width, height, cuda=args.cuda, title=f'{args.agent_name}-{current_time}-{episode_idx}')
             
                 # Save improved model
                 # if best_test_score is None or best_test_score < m_test_score:

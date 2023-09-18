@@ -51,7 +51,7 @@ def generate_all_boards(w, h, vals):
     return [np.array(l).reshape((h,w)) for l in lists]
 
 
-def visualize_qval(net, width, height, title=None):
+def visualize_qval(net, width, height, title=None, cuda=False):
     """Plot Q-values in a grid shaped like the game board"""
 
     fig, axs = plt.subplots(height, width, figsize=(10, 10))
@@ -61,7 +61,10 @@ def visualize_qval(net, width, height, title=None):
             # Get the index for the input neuron
             neuron_index = i*width + j
             # Extract the weights for the 4 outputs corresponding to the current input neuron
-            weights = net.weight[:, neuron_index].detach().numpy()
+            if cuda:
+                weights = net.weight[:, neuron_index].detach().cpu().numpy()
+            else:
+                weights = net.weight[:, neuron_index].detach().numpy()
             
             # Plot the weights as numbers near the four sides of each cell
             axs[i, j].text(0.5, 1.1, f"{weights[3]:.2f}", ha='center', va='center', transform=axs[i, j].transAxes)
