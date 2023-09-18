@@ -6,7 +6,7 @@ import random
 
 Experience = collections.namedtuple(
     'Experience', field_names=['state', 'action', 'reward',
-                               'done', 'new_state'])
+                               'done', 'new_state', 'new_state_valid_moves'])
 
 
 class DQNAgent:
@@ -21,16 +21,21 @@ class DQNAgent:
         self.score = 0.0
 
     @torch.no_grad()
-    def _evaluate(self, net, state, available_moves):
+    def _evaluate(self, net, state, valid_move_mask):
         """get Q values and maximizing action for a given state"""
         state_a = np.array([state], copy=False)
         state_v = torch.tensor(state_a).to(self.device)
         q_vals = net(state_v)
         
-        valid_move_mask = torch.zeros(self.env.action_space.n).to(self.device)
-        valid_move_mask[available_moves] = 1
+        # valid_move_mask = torch.zeros(self.env.action_space.n).to(self.device)
+        # valid_move_mask[available_moves] = 1
+        # q_vals[0][valid_move_mask == 0] = -100 # float('-inf')
 
-        q_vals[0] *= valid_move_mask
+        valid_move_mask = torch.tensor(valid_move_mask, dtype=torch.bool).to(self.device)
+        q_vals[0][~valid_move_mask] = float('-inf') 
+
+        # q_vals[0] *= valid_move_mask
+        # NOTE: negative q value may reult in a non-valid action being chosen
 
         _, act_v = torch.max(q_vals, dim=1)
         action = int(act_v.item())
@@ -38,27 +43,32 @@ class DQNAgent:
 
     @torch.no_grad()
     def play_step(self, net, epsilon=0.0):
-        available_moves = self.env.unwrapped.available_moves()
+        available_move_mask = self.env.unwrapped.available_moves()
+        
 
         if np.random.random() < epsilon:
+            available_moves = [m for m in range(self.env.unwrapped.action_space.n) 
+                               if available_move_mask[m]]
             action = random.choice(available_moves)
         else:
-            _, action = self._evaluate(net, self.state, np.array(available_moves))
+            _, action = self._evaluate(net, self.state, np.array(available_move_mask))
 
         # Take a step in the environment
         new_state, reward, is_done, info = self.env.step(action)
 
         self.score += reward
 
-        exp = Experience(self.state, action, reward,
-                         is_done, new_state)
-
-        # Compute priority for experience
-        q_vals1, _ = self._evaluate(net, self.state, available_moves)
-        next_available_moves = self.env.unwrapped.available_moves()  # TODO could think about saving these in the env
-        q_vals2, greedy_a2 = self._evaluate(net, new_state, next_available_moves)
+        # Compute priority for experience  # TODO should gamma appear here
+        q_vals1, _ = self._evaluate(net, self.state, available_move_mask)
+        next_available_moves_mask = self.env.unwrapped.available_moves()  # TODO could think about saving these in the env
+        q_vals2, greedy_a2 = self._evaluate(net, new_state, next_available_moves_mask)
         delta = reward + (1-is_done) * q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
         priority = max(1, abs(delta))
+
+        # priority = 1
+
+        exp = Experience(self.state, action, reward,
+                         is_done, new_state, next_available_moves_mask)
 
 
         self.exp_buffer.append(exp, priority=priority) 

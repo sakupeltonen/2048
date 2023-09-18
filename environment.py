@@ -169,11 +169,10 @@ class Env2048(gym.Env):
                         return True
             return False
 
-        res = []
+        res = np.array([False]*self.action_space.n)
         for i in range(4):
             _board = np.rot90(self.board, i)
-            if can_move_down(_board):
-                res.append(i)
+            res[i] = can_move_down(_board)
         return res
 
     

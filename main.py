@@ -16,22 +16,28 @@ from tensorboardX import SummaryWriter
 
 
 def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
-    states, actions, rewards, dones, next_states = batch
+    states, actions, rewards, dones, next_states, next_valid_moves_masks = batch
 
     states_v = torch.tensor(np.array(states, copy=False)).to(device)
     next_states_v = torch.tensor(np.array(next_states, copy=False)).to(device)
     actions_v = torch.tensor(actions).to(device)
     rewards_v = torch.tensor(rewards).to(device)
     done_mask = torch.BoolTensor(dones).to(device)
+    next_valid_moves_v = torch.tensor(next_valid_moves_masks, dtype=torch.bool).to(device)
 
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
     with torch.no_grad():
-        # next_state_values = tgt_net(next_states_v).max(1)[0]
+        # TODO Double Q-learning
+        next_q_values = net(next_states_v)
+        next_q_values[~next_valid_moves_v] = float('-inf')
+        next_state_values = next_q_values.max(1)[0]
 
-        # Double Q-learning 
-        next_state_actions = net(next_states_v).max(1)[1]
-        next_state_values = tgt_net(next_states_v).gather(1, 
-        next_state_actions.unsqueeze(-1)).squeeze(-1)
+        # next_state_values = tgt_net(next_states_v).gather(1, next_state_actions.unsqueeze(-1)).squeeze(-1)
+
+        # Double Q-learning  # TODO add mask for valid moves
+        # next_state_actions = net(next_states_v).max(1)[1]
+        # next_state_values = tgt_net(next_states_v).gather(1, 
+        # next_state_actions.unsqueeze(-1)).squeeze(-1)
         
         
         next_state_values[done_mask] = 0.0
@@ -97,6 +103,8 @@ if __name__ == "__main__":
             episode_duration = time.time() - episode_start
             writer.add_scalar("episode duration", episode_duration, episode_idx)
             episode_start = time.time()
+            # TODO this doesn't work during tests.
+            # In general should restructure, so that the game loop is the same for training and testing
 
             # Log average of statistics
             writer.add_scalar("score", score, episode_idx)
@@ -108,7 +116,7 @@ if __name__ == "__main__":
             epsilon = max(specs['epsilon_final'], specs['epsilon_start'] -
                       episode_idx / specs['epsilon_decay_last_episode'])
             
-            # Testing
+            # Testing  # TODO seems to get stuck here, but not on the first test. 
             if episode_idx % specs['test_freq'] == 0:
                 test_scores = []
                 test_max_tiles = []
@@ -121,13 +129,13 @@ if __name__ == "__main__":
                             test_scores.append(score)
                             test_max_tiles.append(max_tile)
 
-                            writer.add_scalar("greedy score", score, episode_idx + i)
-                            writer.add_scalar("greedy max tile", max_tile, episode_idx + i)
                             break
                 
                 # Print and log test statistics
                 m_test_score = round(np.mean(test_scores))
                 m_max_tile = round(np.mean(test_max_tiles))
+                writer.add_scalar("mean greedy score", m_test_score, episode_idx)
+                writer.add_scalar("mean greedy max tile", m_max_tile, episode_idx)
 
                 print(f'Episode {episode_idx}: average score {m_test_score}, average max tile {m_max_tile}')
             
@@ -142,9 +150,11 @@ if __name__ == "__main__":
             episode_idx += 1
 
             # Update target net parameters  # TODO where should this be placed? What is a good value for tau compared to the learning rate
-            for target_param, param in zip(tgt_net.parameters(), net.parameters()):
-                target_param.data.copy_(target_param.data * (1.0 - specs['tau']) + \
-                                            param.data * specs['tau'])
+            # for target_param, param in zip(tgt_net.parameters(), net.parameters()):
+            #     target_param.data.copy_(target_param.data * (1.0 - specs['tau']) + \
+            #                                 param.data * specs['tau'])
+
+            # TEMP
             # if episode_idx % specs['sync_target_net_freq'] == 0:
             #     tgt_net.load_state_dict(net.state_dict())
             
