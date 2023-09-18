@@ -18,8 +18,6 @@ from tools import visualize_qval
 from tensorboardX import SummaryWriter
 
 
-
-
 def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
     states, actions, rewards, dones, next_states = batch
 
@@ -64,7 +62,7 @@ if __name__ == "__main__":
     specs = json.load(open(path, "r"))
 
     desc = specs['desc']
-    # with this map, perfect winrate is possible
+    # with the map in frozenlake-4x4.json, perfect winrate is possible
     width = len(desc[0])
     height = len(desc)
 
@@ -93,7 +91,6 @@ if __name__ == "__main__":
 
     while True:
         res = agent.play_step(net, specs['max_moves'], epsilon=epsilon)  # TODO FIX in main. epsilon is somehow passed even though keyword 
-        
 
         # End of an episode
         if res is not None:  

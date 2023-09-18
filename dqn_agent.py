@@ -32,49 +32,38 @@ class DQNAgent:
 
     @torch.no_grad()
     def play_step(self, net, max_moves, epsilon=0.0):
-        # TODO get a list of valid moves. could also see if that is difficult to learn
+        """
+        NOTE: In the frozenlake environment, it is quite hard to get stuck, even with a deterministic policy. 
+        Even if the policy moves the agent towards the wall, there is always at least a 1/3 chance of moving away, even in the corner.
 
-        # note : nothing prevents from taking moves that don't actually change the board. 
-        # the agent should learn to not do this but make sure
+        The optimal policy may sometimes lead to the agent not moving for one step, since the randoness can turn the agent towards the wall. Fixing this with a random move would be detrimental! The agent relies on specs['max_moves'] to stop long episodes early. 
+        """
+
         if np.random.random() < epsilon:
             action = self.env.action_space.sample()
         else:
             _, action = self._evaluate(net, self.state)
 
-        old_state = self.env.unwrapped.s
-        # do step in the environment
+        # Take a step in the environment
         new_state, reward, is_done, _, info = self.env.step(action)
-
-        # // For frozenlake, this is actually bad and prevents perfect strategies: can't move back safely
-        # while new_state[old_state]:  # while hasn't moved. looks odd because we didn't wrap the old state to one-hot
-        #     action = self.env.action_space.sample()
-        #     new_state, reward, is_done, _, info = self.env.step(action)
-
-        # TEMP: punish losing
-        # if reward == 0 and is_done:
-        #     reward = -1
 
         self.score += reward
         self.move_count += 1
 
-        
-
         exp = Experience(self.state, action, reward,
                          is_done, new_state)
 
-        # Compute priority. TODO clean up. TODO take is_done into account
+        # Compute priority for experience
+        # priority = 1
+
         q_vals1, _ = self._evaluate(net, self.state)
         q_vals2, greedy_a2 = self._evaluate(net, new_state)
-        # delta = reward + gamma * (1-is_done) * q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
         delta = reward + (1-is_done) * q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
-        # TODO gamma should be a factor. make sure the is_done mask is correct
         priority = max(1, abs(delta))
-
-        # priority = 1
 
         self.exp_buffer.append(exp, priority=priority) 
         
-        # TEMP: end overly long / stuck episodes early
+        # End overly long / stuck episodes early
         if self.move_count > max_moves:
             is_done = True
 
