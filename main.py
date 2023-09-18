@@ -81,6 +81,7 @@ if __name__ == "__main__":
     epsilon = specs['epsilon_start']
     optimizer = optim.Adam(net.parameters(), lr=specs['learning_rate'])
 
+    step_idx = 0
     episode_idx = 0
     episode_start = time.time()
     best_test_score = None
@@ -94,6 +95,7 @@ if __name__ == "__main__":
 
             # Time episode
             episode_duration = time.time() - episode_start
+            writer.add_scalar("episode duration", episode_duration, episode_idx)
             episode_start = time.time()
 
             # Log average of statistics
@@ -156,4 +158,6 @@ if __name__ == "__main__":
         loss_t.backward()
         optimizer.step()
 
-        writer.add_scalar("loss", loss_t.detach().item(), episode_idx)
+        writer.add_scalar("loss", loss_t.detach().item(), step_idx)
+
+        step_idx += 1

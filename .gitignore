@@ -12,3 +12,4 @@ test_env.py
 test.py
 .vscode/
 specs/frozenlake-4x4.json
+plots/

@@ -3,7 +3,7 @@
 
     "width": 4,
     "height": 1,
-    "prob_2": 1,
+    "prob_2": 0.9,
     "max_tile": 32,
 	
     "epsilon_start": 1,
@@ -11,15 +11,14 @@
     "epsilon_decay_last_episode": 30000,
 
     "learning_rate": 0.005,
-    "replay_size": 2000,
-    "replay_start_size": 500,
+    "replay_size": 10000,
+    "replay_start_size": 1000,
     "batch_size": 16,
 
-    "gamma": 0.8,
+    "gamma": 0.9,
 
     "layer_size": 32,
     "tau": 0.01,
-    "sync_target_net_freq": 1000,
     
     "test_freq": 1000,
     "test_size": 100
