@@ -48,6 +48,7 @@ if __name__ == "__main__":
     parser.add_argument("--agent-name", default="DQN-4x4")
     parser.add_argument("--cuda", default=False, 
                         action="store_true", help="Enable cuda")
+    parser.add_argument("--save-model", default=False, action="store_true")
     args = parser.parse_args()
 
     specs_file = f"specs/{args.agent_name}.json"
@@ -80,41 +81,26 @@ if __name__ == "__main__":
     epsilon = specs['epsilon_start']
     optimizer = optim.Adam(net.parameters(), lr=specs['learning_rate'])
 
-    scores = []
-    max_tiles = []
-    episode_durations = []  # time in seconds
-    move_counts = []  # steps
-    losses = []
-    stats_period = 500  # logged statistics averaged over stats_period
-
     episode_idx = 0
     episode_start = time.time()
     best_test_score = None
 
     while True:
-        res = agent.play_step(net, epsilon)
+        res = agent.play_step(net, epsilon=epsilon)
 
         # End of an episode
         if res is not None:  
-            score, max_tile, move_count, _ = res
+            score, max_tile, move_count = res
 
-            scores.append(score)
-            max_tiles.append(max_tile)
-            move_counts.append(move_count)
-            
             # Time episode
             episode_duration = time.time() - episode_start
             episode_start = time.time()
-            episode_durations.append(episode_duration)
 
             # Log average of statistics
-            if episode_idx >= stats_period:
-                writer.add_scalar("mean score", np.mean(scores[-stats_period:]), episode_idx)
-                writer.add_scalar("mean max tile", np.mean(max_tiles[-stats_period:]), episode_idx)
-                writer.add_scalar("epsilon", epsilon, episode_idx)
-                writer.add_scalar("mean move count", np.mean(move_counts[-stats_period:]), episode_idx)
-                avg_loss = torch.mean(torch.tensor(losses[-stats_period:]))
-                writer.add_scalar("average loss", avg_loss.item(), episode_idx)
+            writer.add_scalar("score", score, episode_idx)
+            writer.add_scalar("max tile", max_tile, episode_idx)
+            writer.add_scalar("epsilon", epsilon, episode_idx)
+            writer.add_scalar("move count", move_count, episode_idx)
 
             # Update epsilon
             epsilon = max(specs['epsilon_final'], specs['epsilon_start'] -
@@ -124,33 +110,27 @@ if __name__ == "__main__":
             if episode_idx % specs['test_freq'] == 0:
                 test_scores = []
                 test_max_tiles = []
-                invalid_counts = []
                 for i in range(specs['test_size']):
                     # Play a game with epsilon=0
                     while True:
                         res = agent.play_step(net)
                         if res:
-                            score, max_tile, move_count, invalid_move_count = res
+                            score, max_tile, move_count = res
                             test_scores.append(score)
                             test_max_tiles.append(max_tile)
-                            invalid_counts.append(invalid_move_count)
+
+                            writer.add_scalar("greedy score", score, episode_idx + i)
+                            writer.add_scalar("greedy max tile", max_tile, episode_idx + i)
                             break
                 
                 # Print and log test statistics
                 m_test_score = round(np.mean(test_scores))
                 m_max_tile = round(np.mean(test_max_tiles))
-                m_invalid_count = round(np.mean(invalid_counts))
 
-                print(f'Episode {episode_idx}: average score {m_test_score}, average max tile {m_max_tile}, average #invalid {m_invalid_count}')
-                writer.add_scalar("greedy Test Score", 
-                                  m_test_score, episode_idx // specs['test_freq'])
-                writer.add_scalar("greedy Max tile", 
-                                  m_max_tile, episode_idx // specs['test_freq'])
-                writer.add_scalar("greedy Average number of invalid", 
-                                  m_invalid_count, episode_idx // specs['test_freq'])
+                print(f'Episode {episode_idx}: average score {m_test_score}, average max tile {m_max_tile}')
             
                 # Save improved model
-                if best_test_score is None or best_test_score < m_test_score:
+                if args.save_model and (best_test_score is None or best_test_score < m_test_score):
                     torch.save(net.state_dict(), "models/-best_%.0f.dat" % m_test_score)
                     if best_test_score is not None:
                         print("Best score updated %.3f -> %.3f" % (
@@ -159,10 +139,10 @@ if __name__ == "__main__":
 
             episode_idx += 1
 
-            # Update target net parameters
+            # Update target net parameters  # TODO where should this be placed? What is a good value for tau compared to the learning rate
             for target_param, param in zip(tgt_net.parameters(), net.parameters()):
                 target_param.data.copy_(target_param.data * (1.0 - specs['tau']) + \
-                                         param.data * specs['tau'])
+                                            param.data * specs['tau'])
             # if episode_idx % specs['sync_target_net_freq'] == 0:
             #     tgt_net.load_state_dict(net.state_dict())
             
@@ -174,5 +154,6 @@ if __name__ == "__main__":
         batch = buffer.sample(specs['batch_size'])
         loss_t = calc_loss(batch, net, tgt_net, specs['gamma'], device=device)
         loss_t.backward()
-        losses.append(loss_t.detach())
         optimizer.step()
+
+        writer.add_scalar("loss", loss_t.detach().item(), episode_idx)

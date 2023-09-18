@@ -65,6 +65,10 @@ def human_play(width=4, height=4, prob_2=0.9, initial_state=None, filename=None)
         nonlocal game_score
         move = Env2048.action_to_int[direction]
         board, reward, terminated, info = env.step(move)
+        # TEMP
+        testi = env.available_moves()
+        print(testi)
+        
         game_score += reward
         if not info['valid_move']:
             print(f'{direction} is not a valid move')

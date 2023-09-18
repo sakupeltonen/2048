@@ -16,6 +16,8 @@ temp = [2**i for i in range(14)]
 log2 = {temp[i]: i for i in range(1,14)}
 log2[0] = 0
 
+# TODO represent environment as a one-dimensional list for faster access
+
 
 class OnehotWrapper(gym.ObservationWrapper):
     """ Convert observation (board) to array of one-hot vectors """
@@ -148,8 +150,35 @@ class Env2048(gym.Env):
         self.board[c[0]][c[1]] = self._sample_tile()
         return c
         
+
+    def available_moves(self):
+        """Return valid moves on self.board"""
+        def can_move_down(_board):
+            """Test if down is a valid move on _board"""
+            height = len(_board)
+            width = len(_board[0])
+
+            for col in range(width):
+                for row in range(height-1):
+                    if _board[row][col] == 0:
+                        continue
+                    mergeable = _board[row][col] == _board[row + 1][col]
+                    moveable = _board[row + 1][col] == 0
+
+                    if mergeable or moveable:
+                        return True
+            return False
+
+        res = []
+        for i in range(4):
+            _board = np.rot90(self.board, i)
+            if can_move_down(_board):
+                res.append(i)
+        return res
+
     
     def is_done(self):
+        # TODO this might be slightly faster than using available_moves, but could combine for simplicity
         zero_coords = np.argwhere(self.board == 0)
         if len(zero_coords) > 0:
             return False
@@ -166,7 +195,8 @@ class Env2048(gym.Env):
             return False
 
         board_rotated = np.rot90(self.board)  
-        # returns a rotated view of the original data. do not modify board_rotated!
+        # rot90 returns a rotated view of the original data. do not modify board_rotated!
+
         return not exists_mergeable(self.board) and not exists_mergeable(board_rotated)
     
 

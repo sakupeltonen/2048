@@ -11,15 +11,15 @@
     "epsilon_decay_last_episode": 100000,
 
     "learning_rate": 0.005,
-    "replay_size": 3000,
-    "replay_start_size": 500,
+    "replay_size": 100000,
+    "replay_start_size": 5000,
     "batch_size": 16,
 
     "gamma": 0.95,
 
     "layer_size": 256,
-    "tau": 0.005,
+    "tau": 0.01,
 
     "test_freq": 1000,
-    "test_size": 30
+    "test_size": 50
 }

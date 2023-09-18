@@ -12,12 +12,12 @@ class DQN(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(self.input_features, layer_size),
             nn.ReLU(),
-            nn.Linear(layer_size, layer_size),
-            nn.ReLU(),
-            nn.Linear(layer_size, layer_size//2),
-            nn.ReLU(),
-            nn.Linear(layer_size//2, layer_size),
-            nn.ReLU(),
+            # nn.Linear(layer_size, layer_size),
+            # nn.ReLU(),
+            # nn.Linear(layer_size, layer_size//2),
+            # nn.ReLU(),
+            # nn.Linear(layer_size//2, layer_size),
+            # nn.ReLU(),
             nn.Linear(layer_size, layer_size),
             nn.ReLU(),
             nn.Linear(layer_size, n_actions)
