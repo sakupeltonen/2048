@@ -27,12 +27,12 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
 
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
     with torch.no_grad():
-        # Q-learning
+        # Q-learning  # note: losses seem to not converge, something might be wrong as well
         # next_q_values = net(next_states_v)
         # next_q_values[~next_valid_moves_v] = float('-inf')
         # next_state_values = next_q_values.max(1)[0]
 
-        # Double Q-learning # TODO check
+        # Double Q-learning
         next_q_values = net(next_states_v)
         next_q_values[~next_valid_moves_v] = float('-inf')
         next_state_actions = next_q_values.max(1)[1]
@@ -154,12 +154,14 @@ if __name__ == "__main__":
             #                                 param.data * specs['tau'])
 
             # TEMP
-            # if episode_idx % specs['sync_target_net_freq'] == 0:
-            #     tgt_net.load_state_dict(net.state_dict())
-            
+            if episode_idx % specs['sync_target_net_freq'] == 0:
+                tgt_net.load_state_dict(net.state_dict())
+
 
         if len(buffer) < specs['replay_start_size']:
             continue
+
+        
 
         optimizer.zero_grad()
         batch = buffer.sample(specs['batch_size'])
