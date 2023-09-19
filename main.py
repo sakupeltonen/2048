@@ -7,6 +7,7 @@ import argparse
 import time
 import os
 import json
+import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -47,6 +48,27 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
     loss = nn.MSELoss()(state_action_values, expected_state_action_values)
     return loss
 
+# Learning rate schedule
+class CosineAnnealing:
+    def __init__(self, max_lr, min_lr, cycle_length):
+        """
+        :param max_lr: Maximum learning rate (start and end)
+        :param min_lr: Minimum learning rate (middle of the cycle)
+        :param cycle_length: Number of epochs in one cycle
+        """
+        self.max_lr = max_lr
+        self.min_lr = min_lr
+        self.cycle_length = cycle_length
+
+    def get_lr(self, epoch):
+        """
+        Compute the learning rate for a given epoch
+        :param epoch: Current epoch
+        :return: learning rate
+        """
+        lr = self.min_lr + (self.max_lr - self.min_lr) * (1 + math.cos(math.pi * epoch / self.cycle_length)) / 2
+        return lr
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -84,7 +106,9 @@ if __name__ == "__main__":
     buffer = ExperienceBuffer(specs['replay_size'])
     agent = DQNAgent(env, buffer, device=device)
 
-    epsilon = specs['epsilon_start']
+    lr_scheduler = CosineAnnealing(specs['max_lr'], specs['min_lr'], specs['lr_cycle_length'])
+
+    
     optimizer = optim.Adam(net.parameters(), lr=specs['learning_rate'])
 
     step_idx = 0
@@ -93,6 +117,8 @@ if __name__ == "__main__":
     best_test_score = None
 
     while True:
+        epsilon = lr_scheduler(episode_idx)
+
         res = agent.play_step(net, epsilon=epsilon)
 
         # End of an episode
@@ -112,10 +138,6 @@ if __name__ == "__main__":
             writer.add_scalar("epsilon", epsilon, episode_idx)
             writer.add_scalar("move count", move_count, episode_idx)
 
-            # Update epsilon
-            epsilon = max(specs['epsilon_final'], specs['epsilon_start'] -
-                      episode_idx / specs['epsilon_decay_last_episode'])
-            
             # Testing  # TODO seems to get stuck here, but not on the first test. 
             if episode_idx % specs['test_freq'] == 0:
                 test_scores = []

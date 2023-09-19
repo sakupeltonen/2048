@@ -11,6 +11,10 @@
     "epsilon_decay_last_episode": 50000,
 
     "learning_rate": 0.005,
+    "max_lr": 0.05,
+    "min_lr": 0.002,
+    "lr_cycle_length": 2000,
+
     "replay_size": 20000,
     "replay_start_size": 1000,
     "batch_size": 16,
