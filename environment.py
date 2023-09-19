@@ -26,8 +26,8 @@ class OnehotWrapper(gym.ObservationWrapper):
         super(OnehotWrapper, self).__init__(env)
     
     def to_onehot(self):
-        n = log2[self.env.max_tile] + 1
-        onehot = np.zeros((*self.env.board.shape, n), dtype=np.bool_)
+        n = log2[self.env.unwrapped.max_tile] + 1
+        onehot = np.zeros((*self.env.unwrapped.board.shape, n), dtype=np.bool_)
         # TODO instead have board as an argument, so that we can apply it to the afterstate observation
         rows, cols = np.indices(self.env.board.shape)
         log_board = np.vectorize(log2.get)(self.env.board)
