@@ -50,6 +50,9 @@ class AfterstateWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super(AfterstateWrapper, self).__init__(env) 
 
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)
+
     def step(self, move):
         board, reward, _, info = self.env.step(move, generate=False)
         afterstate = board.copy()
@@ -58,9 +61,11 @@ class AfterstateWrapper(gym.ObservationWrapper):
             self.env._place_random_tile()
         
         done = self.env.is_done()
-        info['afterstate'] = afterstate
 
-        return self.env.board, reward, done, info
+        # Store the original (unwrapped) board in info
+        info['board'] = board
+
+        return afterstate, reward, done, info
 
 
 class Env2048(gym.Env):

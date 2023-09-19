@@ -17,13 +17,13 @@ class DQNAgent:
         self._reset()
 
     def _reset(self):
-        self.state = self.env.reset()
+        self.afterstate = self.env.reset() 
         self.score = 0.0
 
     @torch.no_grad()
-    def _evaluate(self, net, state, valid_move_mask):
+    def _evaluate(self, net, afterstate, valid_move_mask):
         """get Q values and maximizing action for a given state"""
-        state_a = np.array([state], copy=False)
+        state_a = np.array([afterstate], copy=False)
         state_v = torch.tensor(state_a).to(self.device)
         q_vals = net(state_v)
         
@@ -44,35 +44,35 @@ class DQNAgent:
     @torch.no_grad()
     def play_step(self, net, epsilon=0.0):
         available_move_mask = self.env.unwrapped.available_moves()
-        
 
         if np.random.random() < epsilon:
             available_moves = [m for m in range(self.env.unwrapped.action_space.n) 
                                if available_move_mask[m]]
             action = random.choice(available_moves)
         else:
-            _, action = self._evaluate(net, self.state, np.array(available_move_mask))
+            _, action = self._evaluate(net, self.afterstate, np.array(available_move_mask))
 
         # Take a step in the environment
-        new_state, reward, is_done, info = self.env.step(action)
+        new_afterstate, reward, is_done, info = self.env.step(action)
+        new_state = info['board']
 
         self.score += reward
 
         # Compute priority for experience  # TODO should gamma appear here
-        q_vals1, _ = self._evaluate(net, self.state, available_move_mask)
+        q_vals1, _ = self._evaluate(net, self.afterstate, available_move_mask)
         next_available_moves_mask = self.env.unwrapped.available_moves()  # TODO could think about saving these in the env
-        q_vals2, greedy_a2 = self._evaluate(net, new_state, next_available_moves_mask)
+        q_vals2, greedy_a2 = self._evaluate(net, new_afterstate, next_available_moves_mask)
         delta = reward + (1-is_done) * q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
         priority = max(1, abs(delta))
 
         # priority = 1
 
-        exp = Experience(self.state, action, reward,
-                         is_done, new_state, next_available_moves_mask)
+        exp = Experience(self.afterstate, action, reward,
+                         is_done, new_afterstate, next_available_moves_mask)
 
 
         self.exp_buffer.append(exp, priority=priority) 
-        self.state = new_state
+        self.afterstate = new_afterstate
         if is_done:
             _score = self.score
             max_tile = self.env.unwrapped.board.max()
