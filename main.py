@@ -45,7 +45,7 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
 
     expected_state_action_values = next_state_values * gamma + rewards_v
 
-    loss = nn.MSELoss()(state_action_values, expected_state_action_values)
+    loss = nn.SmoothL1Loss()(state_action_values, expected_state_action_values)
     return loss
 
 # Learning rate schedule
@@ -117,7 +117,7 @@ if __name__ == "__main__":
     best_test_score = None
 
     while True:
-        epsilon = lr_scheduler(episode_idx)
+        epsilon = lr_scheduler.get_lr(episode_idx)
 
         res = agent.play_step(net, epsilon=epsilon)
 
