@@ -1,6 +1,6 @@
 from dqn_model import DQN
 from dqn_agent import DQNAgent
-from environment import Env2048, OnehotWrapper, AfterstateWrapper, log2
+from environment import Env2048, OnehotWrapper, AfterstateWrapper, RotationInvariantWrapper, log2
 from experience_replay import ExperienceBuffer
 
 import argparse
@@ -65,6 +65,7 @@ if __name__ == "__main__":
                   height=specs['height'], 
                   prob_2=specs['prob_2'], 
                   max_tile=specs['max_tile'])
+    env = RotationInvariantWrapper(env)
     env = AfterstateWrapper(env)
     env = OnehotWrapper(env)
 

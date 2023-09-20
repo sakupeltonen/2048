@@ -4,13 +4,17 @@
     "width": 2,
     "height": 2,
     "prob_2": 0.9,
-    "max_tile": 32,
+    "max_tile": 16,
 	
     "epsilon_start": 1,
     "epsilon_final": 0.01,
     "epsilon_decay_last_episode": 30000,
 
     "learning_rate": 0.005,
+    "max_lr": 0.05,
+    "min_lr": 0.002,
+    "lr_cycle_length": 100000,
+    
     "replay_size": 2000,
     "replay_start_size": 100,
     "batch_size": 16,

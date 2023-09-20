@@ -43,7 +43,7 @@ class DQNAgent:
 
     @torch.no_grad()
     def play_step(self, net, epsilon=0.0):
-        available_move_mask = self.env.unwrapped.available_moves()
+        available_move_mask = self.env.available_moves()
 
         if np.random.random() < epsilon:
             available_moves = [m for m in range(self.env.unwrapped.action_space.n) 
@@ -60,7 +60,7 @@ class DQNAgent:
 
         # Compute priority for experience  # TODO should gamma appear here
         q_vals1, _ = self._evaluate(net, self.afterstate, available_move_mask)
-        next_available_moves_mask = self.env.unwrapped.available_moves()  # TODO could think about saving these in the env
+        next_available_moves_mask = self.env.available_moves()  # TODO could think about saving these in the env
         q_vals2, greedy_a2 = self._evaluate(net, new_afterstate, next_available_moves_mask)
         delta = reward + (1-is_done) * q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
         priority = max(1, abs(delta))

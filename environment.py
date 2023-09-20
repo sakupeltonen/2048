@@ -16,7 +16,7 @@ temp = [2**i for i in range(14)]
 log2 = {temp[i]: i for i in range(1,14)}
 log2[0] = 0
 
-# TODO represent environment as a one-dimensional list for faster access
+
 
 
 class OnehotWrapper(gym.ObservationWrapper):
@@ -25,23 +25,22 @@ class OnehotWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super(OnehotWrapper, self).__init__(env)
     
-    def to_onehot(self):
+    def to_onehot(self, _board):
         n = log2[self.env.unwrapped.max_tile] + 1
-        onehot = np.zeros((*self.env.unwrapped.board.shape, n), dtype=np.bool_)
-        # TODO instead have board as an argument, so that we can apply it to the afterstate observation
-        rows, cols = np.indices(self.env.board.shape)
-        log_board = np.vectorize(log2.get)(self.env.board)
+        onehot = np.zeros((*_board.shape, n), dtype=np.bool_)
+        rows, cols = np.indices(_board.shape)
+        log_board = np.vectorize(log2.get)(_board)
         onehot[rows, cols, log_board] = 1
         return onehot
     
     def reset(self, **kwargs):
-        _ = self.env.reset(**kwargs)
-        return self.to_onehot()
+        _board = self.env.reset(**kwargs)
+        return self.to_onehot(_board)
     
     def step(self, move, **kwargs):
-        _, reward, done, info = self.env.step(move, **kwargs)
-        _board = self.to_onehot()
-        return _board, reward, done, info
+        _board, reward, done, info = self.env.step(move, **kwargs)
+        onehot_board = self.to_onehot(_board)
+        return onehot_board, reward, done, info
         
 
 class AfterstateWrapper(gym.ObservationWrapper):
@@ -58,14 +57,77 @@ class AfterstateWrapper(gym.ObservationWrapper):
         afterstate = board.copy()
 
         if info['valid_move']:
-            self.env._place_random_tile()
+            self.env.unwrapped.place_random_tile()
         
-        done = self.env.is_done()
+        done = self.env.unwrapped.is_done()
 
         # Store the original (unwrapped) board in info
         info['board'] = board
 
         return afterstate, reward, done, info
+    
+
+class RotationInvariantWrapper(gym.ObservationWrapper):
+    """Return rotated board that minimizes a hash function value. The hash is not computed explicitly for efficiency"""
+    # TODO could also add flips
+    # NOTE: computing available moves based on board in info, but the observation is some rotated version. should also return the rotation? Then should give it as info for an action wrapper
+    def __init__(self, env):
+        super(RotationInvariantWrapper, self).__init__(env) 
+
+    def minHash(self):
+        rotated_boards = {i: np.rot90(self.env.unwrapped.board, i) for i in range(4)}  # 4 hardcoded
+
+        candidates = list(range(4))
+        if self.env.unwrapped.width == 1:
+            candidates.remove(1) 
+            candidates.remove(3)
+        if self.env.unwrapped.height == 1:
+            candidates.remove(0)
+            candidates.remove(2)
+
+        for y in reversed(range(self.env.unwrapped.height)):
+            for x in reversed(range(self.env.unwrapped.width)):
+                # get tile at [y][x] in all remaining rotations
+                tiles = [rotated_boards[i][y][x] for i in candidates]
+                
+                # remaining candidates
+                candidates = [i for i in candidates if rotated_boards[i][y][x] == max(tiles)]
+
+                if len(candidates) == 1:
+                    return candidates[0]
+        
+        # board may have rotational symmetries, in which case the first one is chosen
+        return candidates[0]
+                
+
+    def reset(self, **kwargs):
+        board = self.env.reset(**kwargs)
+        rot = self.minHash()
+
+        # store observed rotation 
+        self.observed_rotation = rot 
+
+        return np.rot90(board, rot)
+
+
+    def step(self, move, **kwargs):
+        rotated_move = (move - self.observed_rotation) % 4  #  4 hardcoded  # TODO check
+        board, reward, done, info = self.env.step(rotated_move, **kwargs)
+        
+        # compute new rotation
+        rot = self.minHash()
+        # update observed rotation
+        self.observed_rotation = rot
+
+        return np.rot90(board, rot), reward, done, info   # TODO info['board'] might need to be rotated as well, depending on the order of the wrappers
+    
+    def available_moves(self):
+        original = self.env.unwrapped.available_moves()
+
+        return [original[(a - self.observed_rotation) % 4] for a in range(self.env.action_space.n)]  # TODO check
+
+    
+
 
 
 class Env2048(gym.Env):
@@ -106,8 +168,8 @@ class Env2048(gym.Env):
             return self.board
         if custom_state is None:
             self.board = np.zeros((self.height, self.width), dtype=np.int32)
-            self._place_random_tile()
-            self._place_random_tile()
+            self.place_random_tile()
+            self.place_random_tile()
         else:
             # custom_state possibly given as a one-dimensional list (in row-major order), or 
             # as a two-dimensional np.array
@@ -145,7 +207,7 @@ class Env2048(gym.Env):
         else:
             return 4
 
-    def _place_random_tile(self):
+    def place_random_tile(self):
         """ Place a random tile on board. Return the coordinate where the tile was placed. 
         Assumes that the board is not full."""
         zero_coords = np.argwhere(self.board == 0)
