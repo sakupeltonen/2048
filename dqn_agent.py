@@ -62,7 +62,10 @@ class DQNAgent:
         q_vals1, _ = self._evaluate(net, self.afterstate, available_move_mask)
         next_available_moves_mask = self.env.available_moves()  # TODO could think about saving these in the env
         q_vals2, greedy_a2 = self._evaluate(net, new_afterstate, next_available_moves_mask)
-        delta = reward + (1-is_done) * q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
+        if not is_done:
+            delta = reward + q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
+        else:
+            delta = reward - q_vals1[0][action].item()
         priority = max(1, abs(delta))
 
         # priority = 1
