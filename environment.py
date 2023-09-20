@@ -41,7 +41,15 @@ class OnehotWrapper(gym.ObservationWrapper):
         _board, reward, done, info = self.env.step(move, **kwargs)
         onehot_board = self.to_onehot(_board)
         return onehot_board, reward, done, info
-        
+    
+    """
+    Temp fix to supress warning. 
+    RotationalInvariantWrapper reimplements available_moves.
+    env.available_moves is supposed to search through wrappers to find the one that implements the method, but it is deprecated
+    env.get_attr('available_moves') is supposed to do this, but it doesn't work. 
+    """
+    def available_moves(self):
+        return self.env.available_moves()    
 
 class AfterstateWrapper(gym.ObservationWrapper):
     """Add an observation for the board resulting from a move, before spawning a random tile.
@@ -65,6 +73,10 @@ class AfterstateWrapper(gym.ObservationWrapper):
         info['board'] = board
 
         return afterstate, reward, done, info
+    
+    # see comment in OnehotWrapper
+    def available_moves(self):
+        return self.env.available_moves()    
     
 
 class RotationInvariantWrapper(gym.ObservationWrapper):
@@ -111,7 +123,7 @@ class RotationInvariantWrapper(gym.ObservationWrapper):
 
 
     def step(self, move, **kwargs):
-        rotated_move = (move - self.observed_rotation) % 4  #  4 hardcoded  # TODO check
+        rotated_move = (move + self.observed_rotation) % 4  #  4 hardcoded  # TODO check
         board, reward, done, info = self.env.step(rotated_move, **kwargs)
         
         # compute new rotation
@@ -124,7 +136,10 @@ class RotationInvariantWrapper(gym.ObservationWrapper):
     def available_moves(self):
         original = self.env.unwrapped.available_moves()
 
-        return [original[(a - self.observed_rotation) % 4] for a in range(self.env.action_space.n)]  # TODO check
+        return [original[(a + self.observed_rotation) % 4] for a in range(self.env.action_space.n)]  # TODO check
+    
+    def get_board(self):
+        return np.rot90(self.env.unwrapped.board, self.observed_rotation), self.observed_rotation
 
     
 
@@ -278,6 +293,8 @@ class Env2048(gym.Env):
         # move tiles down in the rotated view
         reward = self._move_down()
 
+        self.score += reward
+
         # reverse the rotation
         self.board = np.rot90(self.board, k=4-move)
 
@@ -286,7 +303,7 @@ class Env2048(gym.Env):
 
         info = {'valid_move': valid_move}
         if valid_move and generate: 
-            loc = self._place_random_tile()
+            loc = self.place_random_tile()
             info['spawn_location'] = loc
         else:
             info['spawn_location'] = None

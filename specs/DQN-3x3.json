@@ -25,6 +25,6 @@
     "tau": 0.01,
     "sync_target_net_freq": 100,
 
-    "test_freq": 1000,
-    "test_size": 50
+    "test_freq": 100,
+    "test_size": 10
 }

@@ -22,6 +22,12 @@ class DQN(nn.Module):
         input = x.view(x.shape[0], -1).float()  
         return self.fc(input)
     
+    @classmethod
+    def from_file(cls, path, device, max_val, board_height, board_width, layer_size, n_actions):
+        model = cls(max_val, board_height, board_width, layer_size, n_actions)
+        model.load_state_dict(torch.load(path, map_location=device))
+        return model
+    
 # alterntaive network. TODO test    
 class DQNConv(nn.Module):
     def __init__(self, max_val, board_height, board_width, layer_size, n_actions):

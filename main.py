@@ -13,6 +13,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from datetime import datetime
 
 from tensorboardX import SummaryWriter
 
@@ -51,6 +52,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, 
                         action="store_true", help="Enable cuda")
     parser.add_argument("--save-model", default=False, action="store_true")
+    parser.add_argument("--net-file", default=None)
     args = parser.parse_args()
 
     specs_file = f"specs/{args.agent_name}.json"
@@ -70,10 +72,15 @@ if __name__ == "__main__":
     env = OnehotWrapper(env)
 
     maxval = log2[specs['max_tile']] + 1
-    net = DQN(maxval, specs['height'], 
-              specs['width'], specs['layer_size'], 4).to(device)
-    tgt_net = DQN(maxval, specs['height'], 
-                  specs['width'], specs['layer_size'], 4).to(device)
+
+    net_args = (maxval, specs['height'], specs['width'], specs['layer_size'], 4)
+    if args.net_file:
+        path = os.path.join(script_dir, args.net_file)
+        net = DQN.from_file(args.net_file, device, *net_args)
+    else:
+        net = DQN(*net_args).to(device)
+
+    tgt_net = DQN(*net_args).to(device)
     tgt_net.load_state_dict(net.state_dict())
     
     writer = SummaryWriter(comment=f"-{args.agent_name}")
@@ -95,6 +102,7 @@ if __name__ == "__main__":
         # Update epsilon
         epsilon = max(specs['epsilon_final'], specs['epsilon_start'] -
                     episode_idx / specs['epsilon_decay_last_episode'])
+        
 
         res = agent.play_step(net, epsilon=epsilon)
 
@@ -115,7 +123,7 @@ if __name__ == "__main__":
             writer.add_scalar("epsilon", epsilon, episode_idx)
             writer.add_scalar("move count", move_count, episode_idx)
 
-            # Testing  # TODO seems to get stuck here, but not on the first test. 
+            # Testing
             if episode_idx % specs['test_freq'] == 0:
                 test_scores = []
                 test_max_tiles = []
@@ -140,7 +148,8 @@ if __name__ == "__main__":
             
                 # Save improved model
                 if args.save_model and (best_test_score is None or best_test_score < m_test_score):
-                    torch.save(net.state_dict(), "models/-best_%.0f.dat" % m_test_score)
+                    now = datetime.now()
+                    torch.save(net.state_dict(), f"models/{now.strftime('%d%b-%H-%M')}-{args.agent_name}.dat")
                     if best_test_score is not None:
                         print("Best score updated %.3f -> %.3f" % (
                             best_test_score, m_test_score))
