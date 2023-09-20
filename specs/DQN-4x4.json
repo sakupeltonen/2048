@@ -8,12 +8,12 @@
 	
     "epsilon_start": 0.8,
     "epsilon_final": 0.02,
-    "epsilon_decay_last_episode": 100000,
+    "epsilon_decay_last_episode": 30000,
     
     "learning_rate": 0.005,
     "max_lr": 0.05,
     "min_lr": 0.002,
-    "lr_cycle_length": 10000,
+    "lr_cycle_length": 100000,
 
     "replay_size": 100000,
     "replay_start_size": 5000,

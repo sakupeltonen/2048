@@ -12,6 +12,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from tensorboardX import SummaryWriter
 
@@ -28,11 +29,6 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
 
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
     with torch.no_grad():
-        # Q-learning  # note: losses seem to not converge, something might be wrong as well
-        # next_q_values = net(next_states_v)
-        # next_q_values[~next_valid_moves_v] = float('-inf')
-        # next_state_values = next_q_values.max(1)[0]
-
         # Double Q-learning
         next_q_values = net(next_states_v)
         next_q_values[~next_valid_moves_v] = float('-inf')
@@ -47,27 +43,6 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
 
     loss = nn.SmoothL1Loss()(state_action_values, expected_state_action_values)
     return loss
-
-# Learning rate schedule
-class CosineAnnealing:
-    def __init__(self, max_lr, min_lr, cycle_length):
-        """
-        :param max_lr: Maximum learning rate (start and end)
-        :param min_lr: Minimum learning rate (middle of the cycle)
-        :param cycle_length: Number of epochs in one cycle
-        """
-        self.max_lr = max_lr
-        self.min_lr = min_lr
-        self.cycle_length = cycle_length
-
-    def get_lr(self, epoch):
-        """
-        Compute the learning rate for a given epoch
-        :param epoch: Current epoch
-        :return: learning rate
-        """
-        lr = self.min_lr + (self.max_lr - self.min_lr) * (1 + math.cos(math.pi * epoch / self.cycle_length)) / 2
-        return lr
 
 
 if __name__ == "__main__":
@@ -106,10 +81,9 @@ if __name__ == "__main__":
     buffer = ExperienceBuffer(specs['replay_size'])
     agent = DQNAgent(env, buffer, device=device)
 
-    lr_scheduler = CosineAnnealing(specs['max_lr'], specs['min_lr'], specs['lr_cycle_length'])
-
     
-    optimizer = optim.Adam(net.parameters(), lr=specs['learning_rate'])
+    optimizer = optim.Adam(net.parameters(), lr=specs['max_lr'])
+    lr_scheduler = CosineAnnealingLR(optimizer, T_max=specs['lr_cycle_length']/2, eta_min=specs['min_lr'])
 
     step_idx = 0
     episode_idx = 0
@@ -117,7 +91,9 @@ if __name__ == "__main__":
     best_test_score = None
 
     while True:
-        epsilon = lr_scheduler.get_lr(episode_idx)
+        # Update epsilon
+        epsilon = max(specs['epsilon_final'], specs['epsilon_start'] -
+                    episode_idx / specs['epsilon_decay_last_episode'])
 
         res = agent.play_step(net, epsilon=epsilon)
 
@@ -183,7 +159,6 @@ if __name__ == "__main__":
 
         if len(buffer) < specs['replay_start_size']:
             continue
-
         
 
         optimizer.zero_grad()
@@ -193,5 +168,8 @@ if __name__ == "__main__":
         optimizer.step()
 
         writer.add_scalar("loss", loss_t.detach().item(), step_idx)
+        writer.add_scalar("learning rate", optimizer.param_groups[0]['lr'], step_idx)
+
+        lr_scheduler.step()
 
         step_idx += 1
