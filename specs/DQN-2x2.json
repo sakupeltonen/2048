@@ -4,7 +4,7 @@
     "width": 2,
     "height": 2,
     "prob_2": 0.9,
-    "max_tile": 16,
+    "max_tile": 32,
 	
     "epsilon_start": 1,
     "epsilon_final": 0.01,
@@ -24,6 +24,6 @@
     "layer_size": 128,
     "sync_target_net_freq": 1000,
     
-    "test_freq": 500,
-    "test_size": 200
+    "test_freq": 100,
+    "test_size": 20
 }

@@ -53,6 +53,7 @@ if __name__ == "__main__":
                         action="store_true", help="Enable cuda")
     parser.add_argument("--save-model", default=False, action="store_true")
     parser.add_argument("--net-file", default=None)
+    parser.add_argument("--session-data-file", default=None)
     args = parser.parse_args()
 
     specs_file = f"specs/{args.agent_name}.json"
@@ -93,8 +94,15 @@ if __name__ == "__main__":
     optimizer = optim.Adam(net.parameters(), lr=specs['max_lr'])
     lr_scheduler = CosineAnnealingLR(optimizer, T_max=specs['lr_cycle_length']/2, eta_min=specs['min_lr'])
 
-    step_idx = 0
-    episode_idx = 0
+    if not args.session_data_file:
+        step_idx = 0
+        episode_idx = 0
+    else:
+        path = os.path.join(script_dir, args.session_data_file)
+        session_data = json.load(open(path, "r"))
+        step_idx = session_data['step_idx']
+        episode_idx = session_data['episode_idx']
+
     episode_start = time.time()
     best_test_score = None
 
@@ -149,11 +157,17 @@ if __name__ == "__main__":
                 # Save improved model
                 if args.save_model and (best_test_score is None or best_test_score < m_test_score):
                     now = datetime.now()
-                    torch.save(net.state_dict(), f"models/{now.strftime('%d%b-%H-%M')}-{args.agent_name}.dat")
-                    if best_test_score is not None:
-                        print("Best score updated %.3f -> %.3f" % (
-                            best_test_score, m_test_score))
+                    filename = now.strftime('%d%b-%H-%M') + args.agent_name
+
+                    torch.save(net.state_dict(), f"models/{filename}.dat")
+
+                    # Save related session data to be able to continue training from this point
+                    session_data = {'episode_idx': episode_idx, 'step_idx': step_idx}
+                    with open('session_data/' + filename + '.json', 'w') as f:
+                        json.dump(session_data, f)
+
                     best_test_score = m_test_score
+
 
             episode_idx += 1
 
