@@ -6,7 +6,7 @@
     "prob_2": 0.9,
     "max_tile": 256,
 	
-    "epsilon_start": 0.2,
+    "epsilon_start": 0.9,
     "epsilon_final": 0.01,
     "epsilon_decay_last_episode": 50000,
 
@@ -25,6 +25,6 @@
     "tau": 0.01,
     "sync_target_net_freq": 100,
 
-    "test_freq": 500,
+    "test_freq": 1000,
     "test_size": 50
 }

@@ -111,6 +111,7 @@ if __name__ == "__main__":
         epsilon = max(specs['epsilon_final'], specs['epsilon_start'] -
                     episode_idx / specs['epsilon_decay_last_episode'])
         
+        # epsilon = 0
 
         res = agent.play_step(net, epsilon=epsilon)
 
