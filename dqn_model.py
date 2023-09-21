@@ -26,6 +26,7 @@ class DQN(nn.Module):
     def from_file(cls, path, device, max_val, board_height, board_width, layer_size, n_actions):
         model = cls(max_val, board_height, board_width, layer_size, n_actions)
         model.load_state_dict(torch.load(path, map_location=device))
+        model.to(device)
         return model
     
 # alterntaive network. TODO test    
