@@ -98,8 +98,10 @@ def save_model(net, session_data, colab=False, drive_dir=None, model_dir="models
         json.dump(session_data, f)
 
     if colab: 
-        shutil.copyfile(model_filename, drive_dir)
-        shutil.copyfile(session_data_filename, drive_dir)
+        shutil.copyfile(model_filename, 
+                        os.path.join(drive_dir, os.path.basename(model_filename)))
+        shutil.copyfile(session_data_filename, 
+                        os.path.join(drive_dir, os.path.basename(session_data_filename)))
 
 
 
