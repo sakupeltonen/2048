@@ -50,39 +50,11 @@ class OnehotWrapper(gym.ObservationWrapper):
     """
     def available_moves(self):
         return self.env.available_moves()    
-
-class AfterstateWrapper(gym.ObservationWrapper):
-    """Add an observation for the board resulting from a move, before spawning a random tile.
-    This should be applied BEFORE one-hot wrapper"""
-    def __init__(self, env):
-        super(AfterstateWrapper, self).__init__(env) 
-
-    def reset(self, **kwargs):
-        return self.env.reset(**kwargs)
-
-    def step(self, move):
-        board, reward, _, info = self.env.step(move, generate=False)
-        afterstate = board.copy()
-
-        if info['valid_move']:
-            self.env.unwrapped.place_random_tile()
         
-        done = self.env.unwrapped.is_done()
-
-        # Store the original (unwrapped) board in info
-        info['board'] = board
-
-        return afterstate, reward, done, info
-    
-    # see comment in OnehotWrapper
-    def available_moves(self):
-        return self.env.available_moves()    
-    
 
 class RotationInvariantWrapper(gym.ObservationWrapper):
     """Return rotated board that minimizes a hash function value. The hash is not computed explicitly for efficiency"""
     # TODO could also add flips
-    # NOTE: computing available moves based on board in info, but the observation is some rotated version. should also return the rotation? Then should give it as info for an action wrapper
     def __init__(self, env):
         super(RotationInvariantWrapper, self).__init__(env) 
 

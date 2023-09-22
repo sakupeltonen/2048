@@ -17,25 +17,18 @@ class DQNAgent:
         self._reset()
 
     def _reset(self):
-        self.afterstate = self.env.reset() 
+        self.state = self.env.reset() 
         self.score = 0.0
 
     @torch.no_grad()
-    def _evaluate(self, net, afterstate, valid_move_mask):
+    def _evaluate(self, net, state, valid_move_mask):
         """get Q values and maximizing action for a given state"""
-        state_a = np.array([afterstate], copy=False)
+        state_a = np.array([state], copy=False)
         state_v = torch.tensor(state_a).to(self.device)
         q_vals = net(state_v)
         
-        # valid_move_mask = torch.zeros(self.env.action_space.n).to(self.device)
-        # valid_move_mask[available_moves] = 1
-        # q_vals[0][valid_move_mask == 0] = -100 # float('-inf')
-
         valid_move_mask = torch.tensor(valid_move_mask, dtype=torch.bool).to(self.device)
         q_vals[0][~valid_move_mask] = float('-inf') 
-
-        # q_vals[0] *= valid_move_mask
-        # NOTE: negative q value may reult in a non-valid action being chosen
 
         _, act_v = torch.max(q_vals, dim=1)
         action = int(act_v.item())
@@ -50,18 +43,17 @@ class DQNAgent:
                                if available_move_mask[m]]
             action = random.choice(available_moves)
         else:
-            _, action = self._evaluate(net, self.afterstate, np.array(available_move_mask))
+            _, action = self._evaluate(net, self.state, np.array(available_move_mask))
 
         # Take a step in the environment
-        new_afterstate, reward, is_done, info = self.env.step(action)
-        new_state = info['board']
+        new_state, reward, is_done, _ = self.env.step(action)
 
         self.score += reward
 
         # Compute priority for experience  # TODO should gamma appear here
-        q_vals1, _ = self._evaluate(net, self.afterstate, available_move_mask)
+        q_vals1, _ = self._evaluate(net, self.state, available_move_mask)
         next_available_moves_mask = self.env.available_moves()  # TODO could think about saving these in the env
-        q_vals2, greedy_a2 = self._evaluate(net, new_afterstate, next_available_moves_mask)
+        q_vals2, greedy_a2 = self._evaluate(net, new_state, next_available_moves_mask)
         if not is_done:
             delta = reward + q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
         else:
@@ -70,12 +62,12 @@ class DQNAgent:
 
         # priority = 1
 
-        exp = Experience(self.afterstate, action, reward,
-                         is_done, new_afterstate, next_available_moves_mask)
+        exp = Experience(self.state, action, reward,
+                         is_done, new_state, next_available_moves_mask)
 
 
         self.exp_buffer.append(exp, priority=priority) 
-        self.afterstate = new_afterstate
+        self.state = new_state
         if is_done:
             _score = self.score
             max_tile = self.env.unwrapped.board.max()
