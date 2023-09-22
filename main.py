@@ -104,6 +104,12 @@ def save_model(net, session_data, colab=False, drive_dir=None, model_dir="models
                         os.path.join(drive_dir, os.path.basename(session_data_filename)))
 
 
+def copy_all_files(src_dir, dst_dir):
+    for item in os.listdir(src_dir):
+        s = os.path.join(src_dir, item)
+        d = os.path.join(dst_dir, item)
+        shutil.copy2(s, d)  # copy2 preserves file metadata
+
 
 
 if __name__ == "__main__":
@@ -146,8 +152,8 @@ if __name__ == "__main__":
     # Initialize logger
     now = datetime.now()  # current date and time
     timestamp = now.strftime('%d%b-%H-%M')
-    log_file = f"runs/{timestamp}-{args.agent_name}"
-    writer = SummaryWriter(log_dir=log_file)
+    log_dir = f"runs/{timestamp}-{args.agent_name}"
+    writer = SummaryWriter(log_dir=log_dir)
     
     # Initialize experience replay buffer 
     buffer = ExperienceBuffer(specs['replay_size'])
@@ -220,10 +226,9 @@ if __name__ == "__main__":
             if episode_idx % specs['sync_target_net_freq'] == 0:
                 tgt_net.load_state_dict(net.state_dict())
         
-        if args.colab:
-            if step_idx % 2000 == 0:
-                shutil.copytree(log_file, os.path.join(drive_dir, os.path.basename(log_file)), False, None)
-
+        if args.colab and step_idx % 2000 == 0:
+            copy_all_files(log_dir, drive_dir)
+                
 
         if len(buffer) < specs['replay_start_size']:
             continue
