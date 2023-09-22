@@ -6,8 +6,8 @@
     "prob_2": 0.9,
     "max_tile": 256,
 	
-    "epsilon_start": 0.9,
-    "epsilon_final": 0.01,
+    "epsilon_start": 0,
+    "epsilon_final": 0,
     "epsilon_decay_last_episode": 50000,
 
     "learning_rate": 0.005,

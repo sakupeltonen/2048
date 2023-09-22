@@ -14,6 +14,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from datetime import datetime
+import shutil
 
 from tensorboardX import SummaryWriter
 
@@ -46,24 +47,74 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
     return loss
 
 
-if __name__ == "__main__":
+def get_program_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--agent-name", default="DQN-4x4")
     parser.add_argument("--cuda", default=False, 
                         action="store_true", help="Enable cuda")
     parser.add_argument("--save-model", default=False, action="store_true")
-    parser.add_argument("--net-file", default=None)
-    parser.add_argument("--session-data-file", default=None)
+    parser.add_argument("--net-file", default=None, help="Location of DQN model")
+    parser.add_argument("--session-data-file", default=None, help="Location of session data file for continuing a previous training session")
+    parser.add_argument("--colab", default=False, action="store_true", help="Set to True when running in Google Colab to make data persistent")
     args = parser.parse_args()
+    return args
 
-    specs_file = f"specs/{args.agent_name}.json"
 
-    device = torch.device("cuda" if args.cuda else "cpu")
+def test_greedy(agent, test_size, net, writer):
+    test_scores = []
+    test_max_tiles = []
+    for _ in range(test_size):
+        # Play a game with epsilon=0
+        while True:
+            res = agent.play_step(net)
+            if res:
+                score, max_tile, _ = res
+                test_scores.append(score)
+                test_max_tiles.append(max_tile)
+
+                break
+    
+    # Print and log test statistics
+    m_test_score = round(np.mean(test_scores))
+    m_max_tile = round(np.mean(test_max_tiles))
+    writer.add_scalar("mean greedy score", m_test_score, episode_idx)
+    writer.add_scalar("mean greedy max tile", m_max_tile, episode_idx)
+
+    print(f'Episode {episode_idx}: average score {m_test_score}, average max tile {m_max_tile}')
+
+
+
+def save_model(net, session_data, colab=False, drive_dir=None, model_dir="models", 
+               session_data_dir="session_data"):
+    """Save DQN net and session data related to training. """
+    now = datetime.now()
+    timestamp = now.strftime('%d%b-%H-%M')
+    model_filename = os.path.join(model_dir, f'{timestamp}{args.agent_name}.dat')
+    session_data_filename = os.path.join(session_data_dir, f'{timestamp}{args.agent_name}.json')
+
+    torch.save(net.state_dict(), model_filename)
+    
+    with open(session_data_filename, 'w') as f:
+        json.dump(session_data, f)
+
+    if colab: 
+        shutil.copyfile(model_filename, drive_dir)
+        shutil.copyfile(session_data_filename, drive_dir)
+
+
+
+
+if __name__ == "__main__":
+    args = get_program_args()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Agent specifications
+    specs_file = f"specs/{args.agent_name}.json"
     path = os.path.join(script_dir, specs_file)
     specs = json.load(open(path, "r"))
 
+    # Create and wrap environment
     env = Env2048(width=specs['width'], 
                   height=specs['height'], 
                   prob_2=specs['prob_2'], 
@@ -74,6 +125,11 @@ if __name__ == "__main__":
 
     maxval = log2[specs['max_tile']] + 1
 
+    drive_dir = "/content/drive/MyDrive/2048"
+
+    device = torch.device("cuda" if args.cuda else "cpu")
+
+    # Create Deep Q networks
     net_args = (maxval, specs['height'], specs['width'], specs['layer_size'], 4)
     if args.net_file:
         path = os.path.join(script_dir, args.net_file)
@@ -83,17 +139,25 @@ if __name__ == "__main__":
 
     tgt_net = DQN(*net_args).to(device)
     tgt_net.load_state_dict(net.state_dict())
-    
-    writer = SummaryWriter(comment=f"-{args.agent_name}")
     print(net)
-
+    
+    # Initialize logger
+    now = datetime.now()  # current date and time
+    timestamp = now.strftime('%d%b-%H-%M')
+    log_file = f"runs/{timestamp}-{args.agent_name}"
+    writer = SummaryWriter(log_dir=log_file)
+    
+    # Initialize experience replay buffer 
     buffer = ExperienceBuffer(specs['replay_size'])
+
+    # Initialize agent
     agent = DQNAgent(env, buffer, device=device)
 
-    
+    # Initialize optimizer
     optimizer = optim.Adam(net.parameters(), lr=specs['max_lr'])
     lr_scheduler = CosineAnnealingLR(optimizer, T_max=specs['lr_cycle_length']/2, eta_min=specs['min_lr'])
 
+    # Initialize session data / resume old session
     if not args.session_data_file:
         step_idx = 0
         episode_idx = 0
@@ -103,16 +167,17 @@ if __name__ == "__main__":
         step_idx = session_data['step_idx']
         episode_idx = session_data['episode_idx']
 
+
     episode_start = time.time()
     best_test_score = None
 
+    # Main loop
     while True:
         # Update epsilon
         epsilon = max(specs['epsilon_final'], specs['epsilon_start'] -
                     episode_idx / specs['epsilon_decay_last_episode'])
-        
-        # epsilon = 0
 
+        # Play one step
         res = agent.play_step(net, epsilon=epsilon)
 
         # End of an episode
@@ -122,9 +187,6 @@ if __name__ == "__main__":
             # Time episode
             episode_duration = time.time() - episode_start
             writer.add_scalar("episode duration", episode_duration, episode_idx)
-            episode_start = time.time()
-            # TODO this doesn't work during tests.
-            # In general should restructure, so that the game loop is the same for training and testing
 
             # Log average of statistics
             writer.add_scalar("score", score, episode_idx)
@@ -134,52 +196,31 @@ if __name__ == "__main__":
 
             # Testing
             if episode_idx % specs['test_freq'] == 0:
-                test_scores = []
-                test_max_tiles = []
-                for i in range(specs['test_size']):
-                    # Play a game with epsilon=0
-                    while True:
-                        res = agent.play_step(net)
-                        if res:
-                            score, max_tile, move_count = res
-                            test_scores.append(score)
-                            test_max_tiles.append(max_tile)
-
-                            break
-                
-                # Print and log test statistics
-                m_test_score = round(np.mean(test_scores))
-                m_max_tile = round(np.mean(test_max_tiles))
-                writer.add_scalar("mean greedy score", m_test_score, episode_idx)
-                writer.add_scalar("mean greedy max tile", m_max_tile, episode_idx)
-
-                print(f'Episode {episode_idx}: average score {m_test_score}, average max tile {m_max_tile}')
+                m_test_score = test_greedy(agent, specs['test_size'], net, writer)
             
                 # Save improved model
                 if args.save_model and (best_test_score is None or best_test_score < m_test_score):
-                    now = datetime.now()
-                    filename = now.strftime('%d%b-%H-%M') + args.agent_name
-
-                    torch.save(net.state_dict(), f"models/{filename}.dat")
-
-                    # Save related session data to be able to continue training from this point
+                    # Save model and related session data to be able to continue training from this point
                     session_data = {'episode_idx': episode_idx, 'step_idx': step_idx}
-                    with open('session_data/' + filename + '.json', 'w') as f:
-                        json.dump(session_data, f)
+                    save_model(net, session_data, colab=args.colab, drive_dir=drive_dir)
 
                     best_test_score = m_test_score
 
 
             episode_idx += 1
+            episode_start = time.time()
 
-            # Update target net parameters  # TODO where should this be placed? What is a good value for tau compared to the learning rate
+            # Update target net parameters
             # for target_param, param in zip(tgt_net.parameters(), net.parameters()):
             #     target_param.data.copy_(target_param.data * (1.0 - specs['tau']) + \
             #                                 param.data * specs['tau'])
 
-            # TEMP
             if episode_idx % specs['sync_target_net_freq'] == 0:
                 tgt_net.load_state_dict(net.state_dict())
+        
+        if args.colab:
+            if step_idx % 2000 == 0:
+                shutil.copyfile(log_file, drive_dir)
 
 
         if len(buffer) < specs['replay_start_size']:
