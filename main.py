@@ -220,7 +220,7 @@ if __name__ == "__main__":
         
         if args.colab:
             if step_idx % 2000 == 0:
-                shutil.copyfile(log_file, drive_dir)
+                shutil.copytree(log_file, drive_dir, False, None)
 
 
         if len(buffer) < specs['replay_start_size']:
