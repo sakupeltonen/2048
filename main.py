@@ -104,7 +104,18 @@ def save_model(net, session_data, colab=False, drive_dir=None, model_dir="models
                         os.path.join(drive_dir, os.path.basename(session_data_filename)))
 
 
-def copy_all_files(src_dir, dst_dir):
+def copy_logs(base_src_dir, log_name, base_dst_dir):
+    """
+       Logs are saved in the runs directory, where each run is created its own folder, base_src_dir/log_name
+       e.g. /runs/Sep20_00-58-36_sakus-mbp-2.lan-DQN-1x4/events.out.tfevents.1695160716.sakus-mbp-2.lan
+        The function copies the contents to Google Drive in base_dst_dir/log_name    
+    """
+    src_dir = os.path.join(base_src_dir, log_name)
+    dst_dir = os.path.join(base_dst_dir, log_name)
+
+    if not os.path.exists(dst_dir):
+        os.makedirs(dst_dir)
+
     for item in os.listdir(src_dir):
         s = os.path.join(src_dir, item)
         d = os.path.join(dst_dir, item)
@@ -152,8 +163,8 @@ if __name__ == "__main__":
     # Initialize logger
     now = datetime.now()  # current date and time
     timestamp = now.strftime('%d%b-%H-%M')
-    log_dir = f"runs/{timestamp}-{args.agent_name}"
-    writer = SummaryWriter(log_dir=log_dir)
+    log_dir = f"{timestamp}-{args.agent_name}"
+    writer = SummaryWriter(log_dir='runs/'+log_dir)
     
     # Initialize experience replay buffer 
     buffer = ExperienceBuffer(specs['replay_size'])
@@ -227,7 +238,7 @@ if __name__ == "__main__":
                 tgt_net.load_state_dict(net.state_dict())
         
         if args.colab and step_idx % 2000 == 0:
-            copy_all_files(log_dir, drive_dir)
+            copy_logs('runs', log_dir, drive_dir)
                 
 
         if len(buffer) < specs['replay_start_size']:
