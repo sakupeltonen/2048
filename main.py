@@ -82,6 +82,8 @@ def test_greedy(agent, test_size, net, writer):
 
     print(f'Episode {episode_idx}: average score {m_test_score}, average max tile {m_max_tile}')
 
+    return m_test_score
+
 
 
 def save_model(net, session_data, colab=False, drive_dir=None, model_dir="models", 

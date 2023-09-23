@@ -82,7 +82,6 @@ class AfterstateWrapper(gym.ObservationWrapper):
 class RotationInvariantWrapper(gym.ObservationWrapper):
     """Return rotated board that minimizes a hash function value. The hash is not computed explicitly for efficiency"""
     # TODO could also add flips
-    # NOTE: computing available moves based on board in info, but the observation is some rotated version. should also return the rotation? Then should give it as info for an action wrapper
     def __init__(self, env):
         super(RotationInvariantWrapper, self).__init__(env) 
 
