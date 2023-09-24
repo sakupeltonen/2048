@@ -10,14 +10,15 @@ Experience = collections.namedtuple(
 
 
 class DQNAgent:
-    def __init__(self, env, exp_buffer, device='cpu'):
+    def __init__(self, env, exp_buffer, specs, device='cpu'):
         self.env = env
         self.exp_buffer = exp_buffer
         self.device = device
+        self.specs = specs
         self._reset()
 
     def _reset(self):
-        self.afterstate = self.env.reset() 
+        self.afterstate = self.env.reset(warm_start=self.specs['warm_start'])
         self.score = 0.0
 
     @torch.no_grad()

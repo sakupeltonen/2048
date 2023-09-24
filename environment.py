@@ -2,6 +2,7 @@ import numpy as np
 import pygame
 import json
 import os
+import random
 import gymnasium as gym
 from gymnasium import spaces
 
@@ -175,16 +176,24 @@ class Env2048(gym.Env):
         self.legal_move_count = 0
         
 
-    def reset(self, empty=False, custom_state=None):
+    def reset(self, empty=False, custom_state=None, warm_start=False):
+        assert sum([empty, warm_start, not (custom_state is None)]) <= 1
+        self.board = np.zeros((self.height, self.width), dtype=np.int32)
         self.score = 0
         self.legal_move_count = 0
         if empty: 
             return self.board
-        if custom_state is None:
-            self.board = np.zeros((self.height, self.width), dtype=np.int32)
+        elif warm_start:
+            random_high_tile = random.choice([x for x in log2.keys() if x < self.max_tile])
+
+            all_coords = [(y,x) for y in range(self.height) for x in range(self.width)]  # get list of all coordinates
+            random_index = np.random.choice(len(all_coords), 1)
+            c = [all_coords[idx] for idx in random_index][0]
+
+            self.board[c[0]][c[1]] = random_high_tile
             self.place_random_tile()
-            self.place_random_tile()
-        else:
+
+        elif not (custom_state is None):
             # custom_state possibly given as a one-dimensional list (in row-major order), or 
             # as a two-dimensional np.array
             if isinstance(custom_state, list):
@@ -196,7 +205,10 @@ class Env2048(gym.Env):
                         i += 1
             else:
                 self.board = custom_state
-
+        else:
+            self.place_random_tile()
+            self.place_random_tile()
+        
         return self.board
     
 
@@ -383,6 +395,7 @@ class Env2048(gym.Env):
         env._place_random_tile()
 
         return env
+    
     
     def _render_pygame(self):
         """

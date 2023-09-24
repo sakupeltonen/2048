@@ -172,7 +172,7 @@ if __name__ == "__main__":
     buffer = ExperienceBuffer(specs['replay_size'])
 
     # Initialize agent
-    agent = DQNAgent(env, buffer, device=device)
+    agent = DQNAgent(env, buffer, specs, device=device)
 
     # Initialize optimizer
     optimizer = optim.Adam(net.parameters(), lr=specs['max_lr'])

@@ -9,6 +9,8 @@
     "epsilon_start": 0.3,
     "epsilon_final": 0.02,
     "epsilon_decay_last_episode": 30000,
+
+    "warm_start": true,
     
     "learning_rate": 0.005,
     "max_lr": 0.05,
