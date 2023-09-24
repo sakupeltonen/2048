@@ -140,7 +140,7 @@ if __name__ == "__main__":
                   height=specs['height'], 
                   prob_2=specs['prob_2'], 
                   max_tile=specs['max_tile'])
-    env = RotationInvariantWrapper(env)
+    # env = RotationInvariantWrapper(env)  # remove wrapper as its purpose was mainly to discourage moving up, which is now taken care of by reward tuning
     env = AfterstateWrapper(env)
     env = OnehotWrapper(env)
 

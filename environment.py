@@ -292,6 +292,10 @@ class Env2048(gym.Env):
         # move tiles down in the rotated view
         reward = self._move_down()
 
+        # REWARD TUNING
+        if move == 2:
+            reward -= 100
+
         self.score += reward
 
         # reverse the rotation

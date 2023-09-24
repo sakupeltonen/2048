@@ -21,10 +21,10 @@
 
     "gamma": 0.95,
 
-    "layer_size": 256,
+    "layer_size": 128,
     "tau": 0.01,
     "sync_target_net_freq": 300,
 
-    "test_freq": 1000,
-    "test_size": 50
+    "test_freq": 300,
+    "test_size": 30
 }
