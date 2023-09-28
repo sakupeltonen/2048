@@ -18,6 +18,40 @@ log2[0] = 0
 
 
 
+class NextStateWrapper(gym.ObservationWrapper):
+    '''Give reward and possible next state for each move'''
+    def __init__(self, env):
+        super(NextStateWrapper, self).__init__(env)
+        copy_env = Env2048(width=env.width, height=env.height, 
+                           prob_2=env.prob_2, max_tile=env.max_tile)
+        self.copy_env = OnehotWrapper(copy_env)
+    
+    def simulate_moves(self):
+        res = []
+        for move in range(self.env.action_space.n):
+            self.copy_env.board = self.env.unwrapped.board.copy()
+            board, reward, done, info = self.copy_env.step(move)
+
+            # reward is approximately normalized. it can be higher than max_tile in rare cases
+            reward_norm = reward / self.env.unwrapped.max_tile
+
+            x = np.concatenate((board.flatten(), 
+                                np.array([reward_norm, done, info['valid_move']])))
+            res.append(x)
+        return np.concatenate(res)
+    
+    def reset(self, **kwargs):
+        board = self.env.reset(**kwargs)
+        res = self.simulate_moves()
+        return np.concatenate((board.flatten(), res))
+    
+    def step(self, move, **kwargs):
+        board, reward, done, info = self.env.step(move, **kwargs)
+        res = self.simulate_moves()
+        
+        obs_v = np.concatenate((board.flatten(), res))
+        return obs_v, reward, done, info
+
 
 class OnehotWrapper(gym.ObservationWrapper):
     """ Convert observation (board) to array of one-hot vectors """
@@ -42,15 +76,6 @@ class OnehotWrapper(gym.ObservationWrapper):
         onehot_board = self.to_onehot(_board)
         return onehot_board, reward, done, info
     
-    """
-    Temp fix to supress warning. 
-    RotationalInvariantWrapper reimplements available_moves.
-    env.available_moves is supposed to search through wrappers to find the one that implements the method, but it is deprecated
-    env.get_attr('available_moves') is supposed to do this, but it doesn't work. 
-    """
-    def available_moves(self):
-        return self.env.available_moves()    
-        
 
 class RotationInvariantWrapper(gym.ObservationWrapper):
     """Return rotated board that minimizes a hash function value. The hash is not computed explicitly for efficiency"""
