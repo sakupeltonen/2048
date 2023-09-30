@@ -8,9 +8,9 @@
     "prob_2": 1,
     "max_tile": 32,
 	
-    "epsilon_start": 0,
+    "epsilon_start": 0.5,
     "epsilon_final": 0,
-    "epsilon_decay_last_episode": 30000,
+    "epsilon_decay_last_episode": 10000,
 
     "learning_rate": 0.005,
     "max_lr": 0.05,

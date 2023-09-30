@@ -11,7 +11,7 @@
     "epsilon_decay_last_episode": 50000,
 
     "learning_rate": 0.005,
-    "max_lr": 0.05,
+    "max_lr": 0.02,
     "min_lr": 0.002,
     "lr_cycle_length": 2000,
 
@@ -19,7 +19,7 @@
     "replay_start_size": 1000,
     "batch_size": 16,
 
-    "gamma": 0.95,
+    "gamma": 0.9,
 
     "layer_size": 128,
     "tau": 0.01,
