@@ -20,7 +20,7 @@ from tensorboardX import SummaryWriter
 
 
 def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
-    states, actions, rewards, dones, next_states, next_valid_moves_masks = batch
+    states, actions, rewards, dones, boards, next_states, next_valid_moves_masks, next_boards = batch
 
     states_v = torch.tensor(np.array(states, copy=False)).to(device)
     next_states_v = torch.tensor(np.array(next_states, copy=False)).to(device)
@@ -198,6 +198,9 @@ if __name__ == "__main__":
 
         # Play one step
         res = agent.play_step(net, epsilon=epsilon)
+
+        # max(1, abs(delta))
+        writer.add_scalar("priority", agent.priority, step_idx)
 
         # End of an episode
         if res is not None:  

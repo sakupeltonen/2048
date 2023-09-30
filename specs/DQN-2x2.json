@@ -3,7 +3,7 @@
 
     "width": 2,
     "height": 2,
-    "prob_2": 0.9,
+    "prob_2": 1,
     "max_tile": 32,
 	
     "epsilon_start": 0,
@@ -21,7 +21,7 @@
 
     "gamma": 0.8,
 
-    "layer_size": 128,
+    "layer_size": 64,
     "sync_target_net_freq": 1000,
     
     "test_freq": 100,

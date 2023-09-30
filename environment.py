@@ -22,11 +22,11 @@ class NextStateWrapper(gym.ObservationWrapper):
     '''Give reward and possible next state for each move'''
     def __init__(self, env):
         super(NextStateWrapper, self).__init__(env)
-        copy_env = Env2048(width=env.width, height=env.height, 
+        self.copy_env = Env2048(width=env.width, height=env.height, 
                            prob_2=env.prob_2, max_tile=env.max_tile)
-        self.copy_env = OnehotWrapper(copy_env)
+        # self.copy_env = OnehotWrapper(copy_env)
     
-    def simulate_moves(self):
+    def simulate_moves(self, debug=False):
         res = []
         for move in range(self.env.action_space.n):
             self.copy_env.board = self.env.unwrapped.board.copy()
@@ -38,6 +38,8 @@ class NextStateWrapper(gym.ObservationWrapper):
             # x = np.concatenate((board.flatten(), 
             #                     np.array([reward_norm, done, info['valid_move']])))
             x = np.array([reward_norm, done, info['valid_move']])
+            if debug:
+                print(f"({move}) reward: {reward}, done: {done}, valid: {info['valid_move']}")
             res.append(x)
         return np.concatenate(res)
     

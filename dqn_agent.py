@@ -5,8 +5,10 @@ import torch
 import random
 
 Experience = collections.namedtuple(
-    'Experience', field_names=['state', 'action', 'reward',
-                               'done', 'new_state', 'new_state_valid_moves'])
+    'Experience', field_names=['state', 'action', 'reward', 'done', 'board', 
+                               'new_state', 'new_state_valid_moves', 'new_board'])
+# state is a wrapped observation, e.g. with afterstates or onehot encoded
+# board is the original board, stored for debugging purposes
 
 
 class DQNAgent:
@@ -18,6 +20,8 @@ class DQNAgent:
 
     def _reset(self):
         self.state = self.env.reset() 
+        self.board = self.env.unwrapped.board.copy()
+        self.extra_obs = self.env.simulate_moves()  # store extra observation from NextStateWrapper for debugging
         self.score = 0.0
 
     @torch.no_grad()
@@ -48,26 +52,32 @@ class DQNAgent:
         # Take a step in the environment
         new_state, reward, is_done, _ = self.env.step(action)
 
+        new_board = self.env.unwrapped.board.copy()
+
         self.score += reward
 
         # Compute priority for experience  # TODO should gamma appear here
         q_vals1, _ = self._evaluate(net, self.state, available_move_mask)
-        next_available_moves_mask = self.env.available_moves()  # TODO could think about saving these in the env
+        next_available_moves_mask = self.env.available_moves()
         q_vals2, greedy_a2 = self._evaluate(net, new_state, next_available_moves_mask)
         if not is_done:
             delta = reward + q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
         else:
             delta = 5*(reward - q_vals1[0][action].item())  # TEMP extra 5 factor 
         priority = max(1, abs(delta))
+        self.priority = priority   # TEMP save priority to log it in main
 
         # priority = 1
 
-        exp = Experience(self.state, action, reward,
-                         is_done, new_state, next_available_moves_mask)
+        exp = Experience(self.state, action, reward, is_done, self.board,
+                    new_state, next_available_moves_mask, new_board)
 
 
         self.exp_buffer.append(exp, priority=priority) 
         self.state = new_state
+        self.board = new_board
+        self.extra_obs = self.env.simulate_moves()  # store extra observation from NextStateWrapper for debugging
+
         if is_done:
             _score = self.score
             max_tile = self.env.unwrapped.board.max()
