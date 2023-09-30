@@ -8,9 +8,12 @@ class DQN(nn.Module):
         super(DQN, self).__init__()
 
         # self.input_features = max_val * board_height * board_width
-        self.input_features = 5 * max_val * board_height * board_width + 4 * 3
+        
+        # self.input_features = 5 * max_val * board_height * board_width + 4 * 3
         # actual board result and 4 * possible next state
         # for each possible next state: done, reward, valid 
+
+        self.input_features = max_val * board_height * board_width + 4 * 3
 
         self.fc = nn.Sequential(
             nn.Linear(self.input_features, layer_size),

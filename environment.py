@@ -35,8 +35,9 @@ class NextStateWrapper(gym.ObservationWrapper):
             # reward is approximately normalized. it can be higher than max_tile in rare cases
             reward_norm = reward / self.env.unwrapped.max_tile
 
-            x = np.concatenate((board.flatten(), 
-                                np.array([reward_norm, done, info['valid_move']])))
+            # x = np.concatenate((board.flatten(), 
+            #                     np.array([reward_norm, done, info['valid_move']])))
+            x = np.array([reward_norm, done, info['valid_move']])
             res.append(x)
         return np.concatenate(res)
     
