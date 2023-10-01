@@ -108,7 +108,7 @@ class DQNAgent:
                 delta = reward + q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
             else:
                 delta = reward - q_vals1[0][action].item() 
-            priority = 10*max(1, abs(delta))  # NOTE: extra multiplier
+            priority = 3*max(1, abs(delta))  # NOTE: extra multiplier
 
             exp = Experience(self.state, action, reward, is_done, self.board,
                         new_state, next_available_moves_mask, new_board)

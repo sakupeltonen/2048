@@ -28,5 +28,6 @@
     "test_freq": 500,
     "test_size": 50,
 
-    "human_played_games": ["01Oct-23-43, 02Oct-00-07"]
+    "human_played_games": ["01Oct-23-43, 02Oct-00-07"],
+    "recall_freq": 2000
 }

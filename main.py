@@ -126,7 +126,6 @@ def copy_logs(base_src_dir, log_name, base_dst_dir):
 
 
 def add_experience_from_file(agent, specs, net):
-    # TODO call in the middle of training as well
     for filename in specs['human_played_games']:
         with open(f'games/{filename}.pkl', 'rb') as file:
             game = pickle.load(file)
@@ -197,8 +196,6 @@ if __name__ == "__main__":
         step_idx = session_data['step_idx']
         episode_idx = session_data['episode_idx']
 
-    add_experience_from_file(agent, specs, net)
-
     episode_start = time.time()
     best_test_score = None
 
@@ -251,6 +248,9 @@ if __name__ == "__main__":
 
             if episode_idx % specs['sync_target_net_freq'] == 0:
                 tgt_net.load_state_dict(net.state_dict())
+
+            if episode_idx % specs['recall_freq'] == 0:
+                add_experience_from_file(agent, specs, net)
         
         if args.colab and step_idx % 2000 == 0:
             copy_logs('runs', log_dir, drive_dir)
