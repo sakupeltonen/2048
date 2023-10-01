@@ -1,6 +1,6 @@
 from dqn_model import DQN
 from dqn_agent import DQNAgent
-from environment import Env2048, OnehotWrapper, AfterstateWrapper, RotationInvariantWrapper, log2
+from environment import Env2048, OnehotWrapper, RotationInvariantWrapper, NextStateWrapper, log2
 from experience_replay import ExperienceBuffer
 
 import argparse
@@ -20,7 +20,7 @@ from tensorboardX import SummaryWriter
 
 
 def calc_loss(batch, net, tgt_net, gamma, device="cpu"):
-    states, actions, rewards, dones, next_states, next_valid_moves_masks = batch
+    states, actions, rewards, dones, boards, next_states, next_valid_moves_masks, next_boards = batch
 
     states_v = torch.tensor(np.array(states, copy=False)).to(device)
     next_states_v = torch.tensor(np.array(next_states, copy=False)).to(device)
@@ -140,9 +140,9 @@ if __name__ == "__main__":
                   height=specs['height'], 
                   prob_2=specs['prob_2'], 
                   max_tile=specs['max_tile'])
-    env = RotationInvariantWrapper(env)
-    env = AfterstateWrapper(env)
+    # env = RotationInvariantWrapper(env)
     env = OnehotWrapper(env)
+    env = NextStateWrapper(env)
 
     maxval = log2[specs['max_tile']] + 1
 
@@ -200,6 +200,9 @@ if __name__ == "__main__":
 
         # Play one step
         res = agent.play_step(net, epsilon=epsilon)
+
+        # max(1, abs(delta))
+        writer.add_scalar("priority", agent.priority, step_idx)
 
         # End of an episode
         if res is not None:  

@@ -63,8 +63,8 @@ class ExperienceBuffer:
             s = np.random.uniform(a, b)
             (idx, p, data) = self.tree.get(s)
             batch.append(data)
-        states, actions, rewards, dones, next_states, next_valid_moves_masks = zip(*batch)
-        return np.array(states), np.array(actions), np.array(rewards, dtype=np.float32), np.array(dones, dtype=np.uint8), np.array(next_states), np.array(next_valid_moves_masks)
+        states, actions, rewards, dones, boards, next_states, next_valid_moves_masks, next_boards = zip(*batch)
+        return np.array(states), np.array(actions), np.array(rewards, dtype=np.float32), np.array(dones, dtype=np.uint8), boards, np.array(next_states), np.array(next_valid_moves_masks), next_boards
 
     def update_priority(self, idx, priority):
         self.tree.update(idx, priority)

@@ -1,21 +1,23 @@
 {
+    "_comment": "The spawn probability of 2 is 1. There exists a policy that always gets the maximum score of 68, ending up with a board containing 16, 8, 4, 2",
+
 	"name": "2x2",
 
     "width": 2,
     "height": 2,
-    "prob_2": 0.9,
+    "prob_2": 1,
     "max_tile": 32,
 	
     "epsilon_start": 0.5,
     "epsilon_final": 0,
-    "epsilon_decay_last_episode": 15000,
+    "epsilon_decay_last_episode": 10000,
 
     "learning_rate": 0.005,
-    "max_lr": 0.02,
+    "max_lr": 0.05,
     "min_lr": 0.002,
     "lr_cycle_length": 100000,
     
-    "replay_size": 4000,
+    "replay_size": 2000,
     "replay_start_size": 100,
     "batch_size": 16,
 

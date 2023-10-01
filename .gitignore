@@ -15,3 +15,4 @@ specs/frozenlake-4x4.json
 plots/
 session_data/
 specs/DQN-3x3-test.json
+aws-setup.txt

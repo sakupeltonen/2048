@@ -18,6 +18,59 @@ log2[0] = 0
 
 
 
+class NextStateWrapper(gym.ObservationWrapper):
+    '''Give reward and possible next state for each move'''
+    def __init__(self, env):
+        super(NextStateWrapper, self).__init__(env)
+        self.copy_env = Env2048(width=env.unwrapped.width, height=env.unwrapped.height, 
+                           prob_2=env.unwrapped.prob_2, max_tile=env.unwrapped.max_tile)
+        # self.copy_env = OnehotWrapper(copy_env)
+    
+    def simulate_moves(self, _board, debug=False):
+        # _board can be specified for debugging purposes
+        res = []
+        for move in range(self.env.action_space.n):
+            self.copy_env.board = _board.copy()
+            board, reward, done, info = self.copy_env.step(move)
+
+            # reward is approximately normalized. it can be higher than max_tile in rare cases
+            reward_norm = reward / self.env.unwrapped.max_tile
+
+            # x = np.concatenate((board.flatten(), 
+            #                     np.array([reward_norm, done, info['valid_move']])))
+            x = np.array([reward_norm, done, info['valid_move']])
+            if debug:
+                print(f"({move}) reward: {reward}, done: {done}, valid: {info['valid_move']}")
+            res.append(x)
+        return np.concatenate(res)
+    
+    def reset(self, **kwargs):
+        board = self.env.reset(**kwargs)
+        res = self.simulate_moves(self.env.unwrapped.board)
+        return np.concatenate((board.flatten(), res))
+    
+    def step(self, move, **kwargs):
+        board, reward, done, info = self.env.step(move, **kwargs)
+        res = self.simulate_moves(self.env.unwrapped.board)
+        
+        obs_v = np.concatenate((board.flatten(), res))
+        return obs_v, reward, done, info
+
+    def observation(self):
+        # Temporary solution to get observation of a manually updated board (for debugging), when not actually moving.
+        # Overlaps with step method, but didn't want to deviate from gym environment customs
+        obs = self.env.observation()
+        additional_obs = self.simulate_moves(self.env.unwrapped.board)
+        return np.concatenate((obs.flatten(), additional_obs))
+
+
+def to_onehot(board, max_tile):
+    n = log2[max_tile] + 1
+    onehot = np.zeros((*board.shape, n), dtype=np.bool_)
+    rows, cols = np.indices(board.shape)
+    log_board = np.vectorize(log2.get)(board)
+    onehot[rows, cols, log_board] = 1
+    return onehot
 
 class OnehotWrapper(gym.ObservationWrapper):
     """ Convert observation (board) to array of one-hot vectors """
@@ -25,58 +78,18 @@ class OnehotWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super(OnehotWrapper, self).__init__(env)
     
-    def to_onehot(self, _board):
-        n = log2[self.env.unwrapped.max_tile] + 1
-        onehot = np.zeros((*_board.shape, n), dtype=np.bool_)
-        rows, cols = np.indices(_board.shape)
-        log_board = np.vectorize(log2.get)(_board)
-        onehot[rows, cols, log_board] = 1
-        return onehot
-    
     def reset(self, **kwargs):
         _board = self.env.reset(**kwargs)
-        return self.to_onehot(_board)
+        return to_onehot(_board, self.env.unwrapped.max_tile)
     
     def step(self, move, **kwargs):
         _board, reward, done, info = self.env.step(move, **kwargs)
-        onehot_board = self.to_onehot(_board)
+        onehot_board = to_onehot(_board, self.env.unwrapped.max_tile)
         return onehot_board, reward, done, info
-    
-    """
-    Temp fix to supress warning. 
-    RotationalInvariantWrapper reimplements available_moves.
-    env.available_moves is supposed to search through wrappers to find the one that implements the method, but it is deprecated
-    env.get_attr('available_moves') is supposed to do this, but it doesn't work. 
-    """
-    def available_moves(self):
-        return self.env.available_moves()    
 
-class AfterstateWrapper(gym.ObservationWrapper):
-    """Add an observation for the board resulting from a move, before spawning a random tile.
-    This should be applied BEFORE one-hot wrapper"""
-    def __init__(self, env):
-        super(AfterstateWrapper, self).__init__(env) 
-
-    def reset(self, **kwargs):
-        return self.env.reset(**kwargs)
-
-    def step(self, move):
-        board, reward, _, info = self.env.step(move, generate=False)
-        afterstate = board.copy()
-
-        if info['valid_move']:
-            self.env.unwrapped.place_random_tile()
-        
-        done = self.env.unwrapped.is_done()
-
-        # Store the original (unwrapped) board in info
-        info['board'] = board
-
-        return afterstate, reward, done, info
-    
-    # see comment in OnehotWrapper
-    def available_moves(self):
-        return self.env.available_moves()    
+    def observation(self):
+        # TEMP solution to get the one-hot encoded board 
+        return to_onehot(self.env.unwrapped.board, self.env.unwrapped.max_tile)
     
 
 class RotationInvariantWrapper(gym.ObservationWrapper):
