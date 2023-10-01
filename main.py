@@ -236,6 +236,9 @@ if __name__ == "__main__":
                     save_model(net, session_data, colab=args.colab, drive_dir=drive_dir)
 
                     best_test_score = m_test_score
+            
+            if episode_idx % specs['recall_freq'] == 0:
+                add_experience_from_file(agent, specs, net)
 
 
             episode_idx += 1
@@ -249,8 +252,7 @@ if __name__ == "__main__":
             if episode_idx % specs['sync_target_net_freq'] == 0:
                 tgt_net.load_state_dict(net.state_dict())
 
-            if episode_idx % specs['recall_freq'] == 0:
-                add_experience_from_file(agent, specs, net)
+            
         
         if args.colab and step_idx % 2000 == 0:
             copy_logs('runs', log_dir, drive_dir)

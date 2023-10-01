@@ -83,7 +83,8 @@ def human_play(args):
             history.append(board.copy())
             actions.append(move)
             env.unwrapped.render()
-            print(f'{direction} -- total score {env.unwrapped.score}')
+            if args.verbose:
+                print(f'{direction} -- total score {env.unwrapped.score}')
 
             if terminated:
                 print(f"Game over. Total score: {env.unwrapped.score}")
@@ -118,6 +119,7 @@ if __name__ == "__main__":
     parser.add_argument("--prob-2", default=0.9, type=float)
     parser.add_argument("--net-file", default=None, type=str, help='Relative path to saved DQN model to be visualized')
     parser.add_argument("--agent-name", default=None, type=str, help='Agent name corresponding to the visualized DQN')
+    parser.add_argument("--verbose", default=False, action="store_true", help='Print moves and score')
     args = parser.parse_args()
 
     # specs_file = f"specs/{args.agent_name}.json"
