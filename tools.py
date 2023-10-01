@@ -1,21 +1,23 @@
 import os
 import pickle
 import numpy as np
+from datetime import datetime
 
-def save_game(history, name):
+def save_game(history, actions):
     """
-       Save a game history to a file
+       Save a game history and the taken actions to a file
     
        Parameters:
        history ([board]): List of game boards
-       name (string): File name
+       actions ([int]): List of taken actions
     """
+    now = datetime.now()
+    timestamp = now.strftime('%d%b-%H-%M')
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    filename = name + '.pkl'
-    path = os.path.join(script_dir,'games', filename)
+    path = os.path.join(script_dir,'games', f'{timestamp}.pkl')
 
     with open(path, 'wb') as file:
-        pickle.dump(history, file)
+        pickle.dump({'history': history, 'actions': actions}, file)
 
 def save_arr(arr, agent_name, arr_name):
     script_dir = os.path.dirname(os.path.abspath(__file__))

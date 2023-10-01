@@ -4,7 +4,6 @@ greedy.py
 agents/
 games/
 **/.DS_Store
-games/
 logs/
 runs/
 models/

@@ -85,3 +85,40 @@ class DQNAgent:
             self._reset()
             return (_score, max_tile, move_count)
         return None  # score is not returned in the middle of an episode
+
+
+    def add_experiences_from_game(self, history, actions, net):
+        '''Testing learning from human played games. The purpose of this method is to add experiences from a given game history.'''
+        self.env.unwrapped.board = history[0]  # NOTE: be careful not to disturb actual games played by the agent
+        self.state = self.env.observation()
+        self.board = history[0]
+        
+        for i in range(len(history)-1):
+            available_move_mask = self.env.unwrapped.available_moves()  # this is needed for computing priority later, although it is not actually used 
+            action = actions[i]
+            new_state, reward, is_done, _ = self.env.step(action)   # note that we don't necessarily have new_state == history[i+1]
+
+            new_board = self.env.unwrapped.board.copy()
+
+            # compute priority
+            q_vals1, _ = self._evaluate(net, self.state, available_move_mask)
+            next_available_moves_mask = self.env.unwrapped.available_moves()
+            q_vals2, greedy_a2 = self._evaluate(net, new_state, next_available_moves_mask)
+            if not is_done:
+                delta = reward + q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
+            else:
+                delta = reward - q_vals1[0][action].item() 
+            priority = 10*max(1, abs(delta))  # NOTE: extra multiplier
+
+            exp = Experience(self.state, action, reward, is_done, self.board,
+                        new_state, next_available_moves_mask, new_board)
+
+            self.exp_buffer.append(exp, priority=priority) 
+
+            # Return to actual played trajectory
+            self.env.unwrapped.board = history[i+1]
+            self.state = self.env.observation()
+            self.board = history[i+1]
+            
+
+        self._reset()

@@ -59,6 +59,7 @@ def human_play(args):
     if visualize_DQN: 
         print_qvals()
     history = [env.unwrapped.board.copy()]
+    actions = []
 
     pg.init()
     screen = pg.display.set_mode((args.width * constants["boxsize"], 
@@ -80,6 +81,7 @@ def human_play(args):
             print(f'{direction} is not a valid move')
         else:
             history.append(board.copy())
+            actions.append(move)
             env.unwrapped.render()
             print(f'{direction} -- total score {env.unwrapped.score}')
 
@@ -105,6 +107,7 @@ def human_play(args):
                     elif event.key == pg.K_d:
                         pass
     pg.quit()
+    save_game(history, actions)
 
 
 

@@ -15,6 +15,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from datetime import datetime
 import shutil
+import pickle
 
 from tensorboardX import SummaryWriter
 
@@ -124,6 +125,14 @@ def copy_logs(base_src_dir, log_name, base_dst_dir):
         shutil.copy2(s, d)  # copy2 preserves file metadata
 
 
+def add_experience_from_file(agent, specs, net):
+    # TODO call in the middle of training as well
+    for filename in specs['human_played_games']:
+        with open(f'games/{filename}.pkl', 'rb') as file:
+            game = pickle.load(file)
+        agent.add_experiences_from_game(game['history'], game['actions'], net)
+
+
 
 if __name__ == "__main__":
     args = get_program_args()
@@ -188,6 +197,7 @@ if __name__ == "__main__":
         step_idx = session_data['step_idx']
         episode_idx = session_data['episode_idx']
 
+    add_experience_from_file(agent, specs, net)
 
     episode_start = time.time()
     best_test_score = None
