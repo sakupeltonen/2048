@@ -26,10 +26,11 @@ class NextStateWrapper(gym.ObservationWrapper):
                            prob_2=env.prob_2, max_tile=env.max_tile)
         # self.copy_env = OnehotWrapper(copy_env)
     
-    def simulate_moves(self, debug=False):
+    def simulate_moves(self, _board, debug=False):
+        # _board can be specified for debugging purposes
         res = []
         for move in range(self.env.action_space.n):
-            self.copy_env.board = self.env.unwrapped.board.copy()
+            self.copy_env.board = _board.copy()
             board, reward, done, info = self.copy_env.step(move)
 
             # reward is approximately normalized. it can be higher than max_tile in rare cases
@@ -45,16 +46,25 @@ class NextStateWrapper(gym.ObservationWrapper):
     
     def reset(self, **kwargs):
         board = self.env.reset(**kwargs)
-        res = self.simulate_moves()
+        res = self.simulate_moves(self.env.unwrapped.board)
         return np.concatenate((board.flatten(), res))
     
     def step(self, move, **kwargs):
         board, reward, done, info = self.env.step(move, **kwargs)
-        res = self.simulate_moves()
+        res = self.simulate_moves(self.env.unwrapped.board)
         
         obs_v = np.concatenate((board.flatten(), res))
         return obs_v, reward, done, info
 
+
+
+def to_onehot(board, max_tile):
+    n = log2[max_tile] + 1
+    onehot = np.zeros((*board.shape, n), dtype=np.bool_)
+    rows, cols = np.indices(board.shape)
+    log_board = np.vectorize(log2.get)(board)
+    onehot[rows, cols, log_board] = 1
+    return onehot
 
 class OnehotWrapper(gym.ObservationWrapper):
     """ Convert observation (board) to array of one-hot vectors """
@@ -62,21 +72,13 @@ class OnehotWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super(OnehotWrapper, self).__init__(env)
     
-    def to_onehot(self, _board):
-        n = log2[self.env.unwrapped.max_tile] + 1
-        onehot = np.zeros((*_board.shape, n), dtype=np.bool_)
-        rows, cols = np.indices(_board.shape)
-        log_board = np.vectorize(log2.get)(_board)
-        onehot[rows, cols, log_board] = 1
-        return onehot
-    
     def reset(self, **kwargs):
         _board = self.env.reset(**kwargs)
-        return self.to_onehot(_board)
+        return to_onehot(_board, self.env.unwrapped.max_tile)
     
     def step(self, move, **kwargs):
         _board, reward, done, info = self.env.step(move, **kwargs)
-        onehot_board = self.to_onehot(_board)
+        onehot_board = to_onehot(_board, self.env.unwrapped.max_tile)
         return onehot_board, reward, done, info
     
 

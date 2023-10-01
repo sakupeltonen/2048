@@ -6,16 +6,16 @@
     "prob_2": 0.9,
     "max_tile": 256,
 	
-    "epsilon_start": 0.2,
+    "epsilon_start": 0.3,
     "epsilon_final": 0.01,
-    "epsilon_decay_last_episode": 50000,
+    "epsilon_decay_last_episode": 200000,
 
     "learning_rate": 0.005,
     "max_lr": 0.02,
     "min_lr": 0.002,
-    "lr_cycle_length": 2000,
+    "lr_cycle_length": 50000,
 
-    "replay_size": 20000,
+    "replay_size": 50000,
     "replay_start_size": 1000,
     "batch_size": 16,
 

@@ -21,7 +21,7 @@ class DQNAgent:
     def _reset(self):
         self.state = self.env.reset() 
         self.board = self.env.unwrapped.board.copy()
-        self.extra_obs = self.env.simulate_moves()  # store extra observation from NextStateWrapper for debugging
+        self.extra_obs = self.env.simulate_moves(self.board)  # store extra observation from NextStateWrapper for debugging
         self.score = 0.0
 
     @torch.no_grad()
@@ -40,7 +40,7 @@ class DQNAgent:
 
     @torch.no_grad()
     def play_step(self, net, epsilon=0.0):
-        available_move_mask = self.env.available_moves()
+        available_move_mask = self.env.unwrapped.available_moves()
 
         if np.random.random() < epsilon:
             available_moves = [m for m in range(self.env.unwrapped.action_space.n) 
@@ -58,7 +58,7 @@ class DQNAgent:
 
         # Compute priority for experience  # TODO should gamma appear here
         q_vals1, _ = self._evaluate(net, self.state, available_move_mask)
-        next_available_moves_mask = self.env.available_moves()
+        next_available_moves_mask = self.env.unwrapped.available_moves()
         q_vals2, greedy_a2 = self._evaluate(net, new_state, next_available_moves_mask)
         if not is_done:
             delta = reward + q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
@@ -76,7 +76,7 @@ class DQNAgent:
         self.exp_buffer.append(exp, priority=priority) 
         self.state = new_state
         self.board = new_board
-        self.extra_obs = self.env.simulate_moves()  # store extra observation from NextStateWrapper for debugging
+        self.extra_obs = self.env.simulate_moves(self.board)  # store extra observation from NextStateWrapper for debugging
 
         if is_done:
             _score = self.score
