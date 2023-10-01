@@ -63,7 +63,7 @@ class DQNAgent:
         if not is_done:
             delta = reward + q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
         else:
-            delta = 5*(reward - q_vals1[0][action].item())  # TEMP extra 5 factor 
+            delta = reward - q_vals1[0][action].item() 
         priority = max(1, abs(delta))
         self.priority = priority   # TEMP save priority to log it in main
 
