@@ -108,6 +108,9 @@ def human_play(args):
                     if event.key in direction_from_pg.keys():
                         direction = direction_from_pg[event.key]
                         handle_keypress(direction)
+                    elif event.key == pg.K_s:
+                        filename = '-'.join(map(str,env.unwrapped.board.flatten()))
+                        pg.image.save(screen, f'screenshots/{filename}.jpg')
                     elif event.key == pg.K_a:
                         pass
                     elif event.key == pg.K_d:
@@ -125,6 +128,7 @@ if __name__ == "__main__":
     parser.add_argument("--net-file", default=None, type=str, help='Relative path to saved DQN model to be visualized')
     parser.add_argument("--agent-name", default=None, type=str, help='Agent name corresponding to the visualized DQN')
     parser.add_argument("--verbose", default=False, action="store_true", help='Print moves and score')
+    parser.add_argument("--no-save", default=False, action="store_true", help="Stop saveíng the played game")
     args = parser.parse_args()
 
     # specs_file = f"specs/{args.agent_name}.json"
