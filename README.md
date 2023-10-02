@@ -4,34 +4,38 @@ This project implements DQN to the game of 2048. The agent uses Double DQN, afte
 
 ## **Overview**
 
-2048 is a single-player sliding block puzzle game. The objective is to slide numbered tiles on a 4x4 grid to combine them and create a tile with the number 2048. The player slides tiles either up, down, left, or right. Two tiles with the same number can be merged into one, with double the value. The game is won when a tile with the value 2048 appears, though players can continue to play to achieve higher scores. The game is lost if there are no possible moves. 
-
 ## Environment
 
 ### **Env2048**
 
+2048 is a single-player sliding block puzzle game. The objective is to slide numbered tiles on a 4x4 grid to combine them and create a tile with the number 2048. The player slides tiles either up, down, left, or right. Two tiles with the same number can be merged into one, with double the value. The game is won when a tile with the value 2048 appears, though players can continue to play to achieve higher scores. The game is lost if there are no possible moves. 
+
 ### Wrappers
-- **OnehotWrapper** Encodes the board into a one-hot vector. 
+- **OnehotWrapper** Encodes the board into an array of one-hot vectors
 - **PenalizeMovingUpWrapper** This wrapper penalizes the agent for moving up. It also has the capability to block the 'up' move by removing it from the available moves whenever other moves are available.
 - **AfterstateWrapper** is an observation wrapper that returns the environment state after applying a given action, before spawning a random tile.
 - **NextStateWrapper** This is an observation wrapper that adds information to help the agent understand the environment dynamics. For each possible move (left, right, down, up) **in the new state**, the information includes
   - reward (approximately normalized by dividing by `max_tile`)
   - whether the move is valid
   - whether the game ended (in one possible outcome for the move)
-- **RotationInvariantWrapper** The original 2048 game is symmetric w.r.t. rotation and reflection. This wrapper returns a rotation-invariant observation of the board. Actions taken by the agent are reversed corresponding to the rotation, so that their effect in the original environment is appropriate. The wrapper should help the agent to better understand the relevant effect of its actions.
 
-## **Features**
+**RotationInvariantWrapper** The original 2048 game is symmetric w.r.t. rotation and reflection. This wrapper returns a rotation-invariant observation of the board. Actions taken by the agent are reversed corresponding to the rotation, so that their effect in the original environment is appropriate. The wrapper should help the agent to better understand the relevant effect of its actions. For example, consider the following state (*first picture*). The consequtive tiles are lined up nicely, which makes it easy to eventually combine them once the 64 is turned into another 256 tile.
 
-- **Environment**: OpenAI Gym environment for 2048.
-  - `OnehotWrapper`: Converts discrete action spaces in gym environments into one-hot encoded representations
-  - 
-- **DQN Agent**: The agent uses Double DQN and afterstates.
-  - The network takes in an (afterstate) observation of the board encoded as a _width_ x _height_ x log(_maxtile_) sized one-hot vector. The output is a 4-dimensional vector corresponding to the Q-values for the 4 possible moves. The network architecture consists of 3 linear layers with ReLU activations for the first 2 layers (the last layer does not have an activation function since Q-values are not restricted to the unit interval). 
+<p align="left">
+  <img src="/screenshots/0-2-0-0-0-0-0-0-0-0-0-0-64-256-512-1024.jpg" width="250" hspace="20" />
+  <img src="/screenshots/64-2-512-1024-0-256-0-0-0-0-0-0-0-0-2-0.jpg" width="250" hspace="20" />
+  <img src="/screenshots/0-2-0-0-0-0-0-0-0-256-0-0-64-2-512-1024.jpg" width="250" hspace="20" /> 
+</p>
+
+(*Second picture*): Moving up breaks the alignment, and now there is less space on the board to create new tiles. However, the game state looks quite different to the DQN, so it might be difficult to assess the effect of moving up. (*Third picure*): The state after moving up, when applying `RotationInvariantWrapper`. This state resembles the previous state, as the majority of tiles are in their original place, but the structure of the board is clearly different.  
+
+
+## DQN Agent
+<!-- The agent uses Double DQN and afterstates. The network takes in a (wrapped) observation of the environment. The output is a 4-dimensional vector corresponding to the Q-values for the 4 possible moves. The network architecture consists of 5 linear layers with ReLU activations for the first 4 layers (the last layer does not have an activation function since Q-values are not restricted to the unit interval). 
 - **Experience replay** Implements an experience replay buffer with custom weights. A sum tree data structure allows sampling experiences from the buffer in $O(\log N)$ time, where N is the buffer size.
-- **Human play**: Play the game yourself. Board size and spawning probability can be customized.
-- **Frozenlake**: I tested the agent with the OpenAI Frozenlake environment. The current implementation is in another branch. 
+- **Frozenlake**: I tested the agent with the OpenAI Frozenlake environment. The current implementation is in another branch. --->
 
-## **Agent specifications**
+### Agent specifications
 The specifications of an agent are stored in a JSON file: 
 
 - `name`: Name of the agent. There should be a corresponding file in `/specs`. 
@@ -50,4 +54,7 @@ The specifications of an agent are stored in a JSON file:
 - `test_size`: Number of episodes per test.
 - `human_played_games`: List of file names stored in `/games` as `.pkl` files, used as experiences.
 - `recall_freq`: Frequency (in episodes) of re-inserting the human played games to the replay buffer. 
+
+## Human Play
+<!-- Play the game yourself. Board size and spawning probability can be customized. --->
 
