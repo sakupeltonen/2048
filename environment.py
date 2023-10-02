@@ -32,6 +32,14 @@ class PenalizeMovingUpWrapper(gym.Wrapper):
             reward *= self.up_penalty_factor
             
         return observation, reward, done, info
+    
+
+    def available_moves():
+        '''TEMP'''
+        res = self.env.unwrapped.available_moves()
+        if len(res) > 1 and 2 in res:
+            res.remove(2)
+        return res
 
 
 class NextStateWrapper(gym.ObservationWrapper):

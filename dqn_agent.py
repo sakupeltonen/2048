@@ -39,7 +39,7 @@ class DQNAgent:
 
     @torch.no_grad()
     def play_step(self, net, epsilon=0.0):
-        available_move_mask = self.env.unwrapped.available_moves()
+        available_move_mask = self.env.available_moves()
 
         if np.random.random() < epsilon:
             available_moves = [m for m in range(self.env.unwrapped.action_space.n) 
