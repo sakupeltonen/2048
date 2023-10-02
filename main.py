@@ -149,7 +149,7 @@ if __name__ == "__main__":
                   prob_2=specs['prob_2'], 
                   max_tile=specs['max_tile'])
     # env = RotationInvariantWrapper(env)
-    env = PenalizeMovingUpWrapper(env, specs['up_penalty_factor'])
+    env = PenalizeMovingUpWrapper(env, specs['up_penalty_factor'], specs['block_moving_up'])
     env = OnehotWrapper(env)
     env = NextStateWrapper(env)
 

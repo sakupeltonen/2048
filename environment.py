@@ -18,9 +18,10 @@ log2[0] = 0
 
 
 class PenalizeMovingUpWrapper(gym.Wrapper):
-    def __init__(self, env, up_penalty_factor):
+    def __init__(self, env, up_penalty_factor, block_moving_up):
         super(PenalizeMovingUpWrapper, self).__init__(env)
         self.up_penalty_factor = up_penalty_factor
+        self.block_moving_up = block_moving_up
 
     def reset(self, **kwargs):
         return self.env.reset(**kwargs)
@@ -34,11 +35,12 @@ class PenalizeMovingUpWrapper(gym.Wrapper):
         return observation, reward, done, info
     
 
-    def available_moves():
+    def available_moves(self):
         '''TEMP'''
         res = self.env.unwrapped.available_moves()
-        if len(res) > 1 and 2 in res:
-            res.remove(2)
+        if self.block_moving_up:
+            if len(res) > 1 and 2 in res:
+                res.remove(2)
         return res
 
 
@@ -87,6 +89,9 @@ class NextStateWrapper(gym.ObservationWrapper):
         additional_obs = self.simulate_moves(self.env.unwrapped.board)
         return np.concatenate((obs.flatten(), additional_obs))
 
+    def available_moves(self):
+        return self.env.available_moves()
+
 
 def to_onehot(board, max_tile):
     n = log2[max_tile] + 1
@@ -115,9 +120,13 @@ class OnehotWrapper(gym.ObservationWrapper):
         # TEMP solution to get the one-hot encoded board 
         return to_onehot(self.env.unwrapped.board, self.env.unwrapped.max_tile)
     
+    def available_moves(self):
+        return self.env.available_moves()
+    
 
 class RotationInvariantWrapper(gym.ObservationWrapper):
     """Return rotated board that minimizes a hash function value. The hash is not computed explicitly for efficiency"""
+    # TODO this class is outdated
     # TODO could also add flips
     def __init__(self, env):
         super(RotationInvariantWrapper, self).__init__(env) 

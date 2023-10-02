@@ -31,5 +31,6 @@
     "human_played_games": ["3x3-01Oct-23-43", "3x3-02Oct-00-07", "3x3-02Oct-00-37", "3x3-02Oct-10-34"],
     "recall_freq": 2000,
 
-    "up_penalty_factor": 0.5
+    "up_penalty_factor": 0.5,
+    "block_moving_up": true
 }
