@@ -22,7 +22,6 @@ class DQNAgent:
         self.state = self.env.reset() 
         self.board = self.env.unwrapped.board.copy()
         self.extra_obs = self.env.simulate_moves(self.board)  # store extra observation from NextStateWrapper for debugging
-        self.score = 0.0
 
     @torch.no_grad()
     def _evaluate(self, net, state, valid_move_mask):
@@ -54,8 +53,6 @@ class DQNAgent:
 
         new_board = self.env.unwrapped.board.copy()
 
-        self.score += reward
-
         # Compute priority for experience  # TODO should gamma appear here
         q_vals1, _ = self._evaluate(net, self.state, available_move_mask)
         next_available_moves_mask = self.env.unwrapped.available_moves()
@@ -79,11 +76,11 @@ class DQNAgent:
         self.extra_obs = self.env.simulate_moves(self.board)  # store extra observation from NextStateWrapper for debugging
 
         if is_done:
-            _score = self.score
+            score = self.env.unwrapped.score
             max_tile = self.env.unwrapped.board.max()
             move_count = self.env.unwrapped.legal_move_count
             self._reset()
-            return (_score, max_tile, move_count)
+            return (score, max_tile, move_count)
         return None  # score is not returned in the middle of an episode
 
 

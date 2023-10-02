@@ -17,6 +17,22 @@ log2 = {temp[i]: i for i in range(1,14)}
 log2[0] = 0
 
 
+class PenalizeMovingUpWrapper(gym.Wrapper):
+    def __init__(self, env, up_penalty_factor):
+        super(PenalizeMovingUpWrapper, self).__init__(env)
+        self.up_penalty_factor = up_penalty_factor
+
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)
+    
+    def step(self, move, **kwargs):
+        observation, reward, done, info = self.env.step(move, **kwargs)
+        
+        if move == 2:
+            reward *= self.up_penalty_factor
+            
+        return observation, reward, done, info
+
 
 class NextStateWrapper(gym.ObservationWrapper):
     '''Give reward and possible next state for each move'''
