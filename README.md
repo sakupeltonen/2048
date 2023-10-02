@@ -11,10 +11,11 @@ This project implements DQN to the game of 2048. The agent uses Double DQN, afte
 2048 is a single-player sliding block puzzle game. The objective is to slide numbered tiles on a 4x4 grid to combine them and create a tile with the number 2048. The player slides tiles either up, down, left, or right. Two tiles with the same number can be merged into one, with double the value. The game is won when a tile with the value 2048 appears, though players can continue to play to achieve higher scores. The game is lost if there are no possible moves. 
 
 ### Wrappers
-- **OnehotWrapper** Encodes the board into an array of one-hot vectors
-- **PenalizeMovingUpWrapper** This wrapper penalizes the agent for moving up. It also has the capability to block the 'up' move by removing it from the available moves whenever other moves are available.
-- **AfterstateWrapper** is an observation wrapper that returns the environment state after applying a given action, before spawning a random tile.
-- **NextStateWrapper** This is an observation wrapper that adds information to help the agent understand the environment dynamics. For each possible move (left, right, down, up) **in the new state**, the information includes
+**OnehotWrapper** Encodes the board into an array of one-hot vectors.
+
+**AfterstateWrapper** is an observation wrapper that returns the environment state after applying a given action, before spawning a random tile.
+
+**NextStateWrapper** This is an observation wrapper that adds information to help the agent understand the environment dynamics. For each possible move (left, right, down, up) **in the new state**, the information includes
   - reward (approximately normalized by dividing by `max_tile`)
   - whether the move is valid
   - whether the game ended (in one possible outcome for the move)
@@ -28,6 +29,8 @@ This project implements DQN to the game of 2048. The agent uses Double DQN, afte
 </p>
 
 (*Second picture*): Moving up breaks the alignment, and now there is less space on the board to create new tiles. However, the game state looks quite different to the DQN, so it might be difficult to assess the effect of moving up. (*Third picure*): The state after moving up, when applying `RotationInvariantWrapper`. This state resembles the previous state, as the majority of tiles are in their original place, but the structure of the board is clearly different.  
+
+**PenalizeMovingUpWrapper** An alternative to `RotationInvariantWrapper`. This wrapper simply penalizes the agent for moving up. It also has the capability to block the 'up' move by removing it from the available moves whenever other moves are available.
 
 
 ## DQN Agent
