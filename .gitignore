@@ -2,7 +2,6 @@ notes.txt
 __pycache__/
 greedy.py
 agents/
-games/
 **/.DS_Store
 logs/
 runs/

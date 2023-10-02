@@ -11,10 +11,13 @@ def save_game(history, actions):
        history ([board]): List of game boards
        actions ([int]): List of taken actions
     """
+    height = len(history[0])
+    width = len(history[0][0])
+
     now = datetime.now()
     timestamp = now.strftime('%d%b-%H-%M')
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.join(script_dir,'games', f'{timestamp}.pkl')
+    path = os.path.join(script_dir,'games', f'{height}x{width}-{timestamp}.pkl')
 
     with open(path, 'wb') as file:
         pickle.dump({'history': history, 'actions': actions}, file)

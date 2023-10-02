@@ -28,14 +28,19 @@ def human_play(args):
 
     # dont use wrappers but get the observation manually. better for when manually changing board. no, actually write an observe method
     if not visualize_DQN:
-        env = Env2048(width=args.width, height=args.height, prob_2=args.prob_2, render_mode='human')
+        width = args.width
+        height = args.height
+        env = Env2048(width=width, height=height, prob_2=args.prob_2, render_mode='human')
     else:
         assert args.agent_name
         specs_file = f"specs/{args.agent_name}.json"
         path = os.path.join(script_dir, specs_file)
         specs = json.load(open(path, "r"))
 
-        env = Env2048(width=specs['width'], height=specs['height'], prob_2=specs['prob_2'], max_tile=specs['max_tile'], render_mode='human')
+        width = specs['width']
+        height = specs['height']
+
+        env = Env2048(width=width, height=height, prob_2=specs['prob_2'], max_tile=specs['max_tile'], render_mode='human')
         env = OnehotWrapper(env)
         env = NextStateWrapper(env)
 
@@ -62,8 +67,8 @@ def human_play(args):
     actions = []
 
     pg.init()
-    screen = pg.display.set_mode((args.width * constants["boxsize"], 
-                                  args.height * constants["boxsize"]))
+    screen = pg.display.set_mode((width * constants["boxsize"], 
+                                  height * constants["boxsize"]))
     pg.display.set_caption("2048")
     pg_running = True
     terminated = False
