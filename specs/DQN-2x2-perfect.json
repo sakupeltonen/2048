@@ -27,5 +27,8 @@
     "sync_target_net_freq": 1000,
     
     "test_freq": 100,
-    "test_size": 20
+    "test_size": 20,
+
+    "human_played_games": [],
+    "recall_freq": 2000
 }
