@@ -21,6 +21,7 @@
 
     "gamma": 0.9,
 
+    "network_type": "DQN",
     "layer_size": 128,
     "tau": 0.01,
     "sync_target_net_freq": 100,

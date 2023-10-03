@@ -1,4 +1,4 @@
-from dqn_model import DQN
+from dqn_model import DQN, DQNConv
 from dqn_agent import DQNAgent
 from environment import Env2048, OnehotWrapper, RotationInvariantWrapper, NextStateWrapper, PenalizeMovingUpWrapper, log2
 from experience_replay import ExperienceBuffer
@@ -138,10 +138,20 @@ if __name__ == "__main__":
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # Agent specifications
-    specs_file = f"specs/{args.agent_name}.json"
-    path = os.path.join(script_dir, specs_file)
-    specs = json.load(open(path, "r"))
+    # Get agent specifications / resume old session
+    if not args.session_data_file:
+        step_idx = 0
+        episode_idx = 0
+
+        specs_file = f"specs/{args.agent_name}.json"
+        path = os.path.join(script_dir, specs_file)
+        specs = json.load(open(path, "r"))
+    else:
+        path = os.path.join(script_dir, args.session_data_file)
+        specs = json.load(open(path, "r"))
+        step_idx = specs['step_idx']
+        episode_idx = specs['episode_idx']
+
 
     # Create and wrap environment
     env = Env2048(width=specs['width'], 
@@ -155,21 +165,27 @@ if __name__ == "__main__":
     env = NextStateWrapper(env)
     n_extra_feature = 12  # from NextStateWrapper
 
-    maxval = log2[specs['max_tile']] + 1
+    max_val = log2[specs['max_tile']] + 1
+    specs['max_val'] = max_val
 
     drive_dir = "/content/drive/MyDrive/2048"
 
     device = torch.device("cuda" if args.cuda else "cpu")
 
     # Create Deep Q networks
-    net_args = (maxval, specs['height'], specs['width'], specs['layer_size'], 4)
+    if specs['network_type'] == 'DQN':
+        net_class = DQN
+    else:
+        assert specs['network_type'] == 'DQNConv'
+        net_class = DQNConv
+    
     if args.net_file:
         path = os.path.join(script_dir, args.net_file)
-        net = DQN.from_file(args.net_file, device, *net_args)
+        net = net_class.from_file(args.net_file, device, specs)
     else:
-        net = DQN(*net_args).to(device)
-
-    tgt_net = DQN(*net_args).to(device)
+        net = net_class(specs).to(device)
+        
+    tgt_net = net_class(specs).to(device)
     tgt_net.load_state_dict(net.state_dict())
     print(net)
     
@@ -188,16 +204,6 @@ if __name__ == "__main__":
     # Initialize optimizer
     optimizer = optim.Adam(net.parameters(), lr=specs['max_lr'])
     lr_scheduler = CosineAnnealingLR(optimizer, T_max=specs['lr_cycle_length']/2, eta_min=specs['min_lr'])
-
-    # Initialize session data / resume old session
-    if not args.session_data_file:
-        step_idx = 0
-        episode_idx = 0
-    else:
-        path = os.path.join(script_dir, args.session_data_file)
-        session_data = json.load(open(path, "r"))
-        step_idx = session_data['step_idx']
-        episode_idx = session_data['episode_idx']
 
     episode_start = time.time()
     best_test_score = None
@@ -235,7 +241,8 @@ if __name__ == "__main__":
                 # Save improved model
                 if args.save_model and (best_test_score is None or best_test_score < m_test_score):
                     # Save model and related session data to be able to continue training from this point
-                    session_data = {'episode_idx': episode_idx, 'step_idx': step_idx}
+                    training_info = {'episode_idx': episode_idx, 'step_idx': step_idx}
+                    session_data = {**specs, **training_info}
                     save_model(net, session_data, colab=args.colab, drive_dir=drive_dir)
 
                     best_test_score = m_test_score
