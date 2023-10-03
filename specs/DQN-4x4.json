@@ -35,7 +35,7 @@
 
     "up_penalty_factor": 0.5,
     "block_moving_up": true,
-    "reward_base": 10,
+    "reward_base": 3,
 
     "save_freq": 2000
 }
