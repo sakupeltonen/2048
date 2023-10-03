@@ -2,8 +2,6 @@
 
 This project implements DQN to the game of 2048. The agent uses Double DQN, afterstates, as well as weighted experience replay. 
 
-## **Overview**
-
 ## Environment
 
 ### **Env2048**
