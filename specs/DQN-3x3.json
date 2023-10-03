@@ -19,7 +19,7 @@
     "replay_start_size": 1000,
     "batch_size": 16,
 
-    "gamma": 0.9,
+    "gamma": 0.95,
 
     "network_type": "DQN",
     "layer_size": 128,
