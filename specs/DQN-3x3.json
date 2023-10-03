@@ -32,5 +32,7 @@
     "recall_freq": 2000,
 
     "up_penalty_factor": 0.5,
-    "block_moving_up": true
+    "block_moving_up": true,
+
+    "save_freq": 2000
 }

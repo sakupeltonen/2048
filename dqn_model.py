@@ -39,21 +39,26 @@ class DQN(nn.Module):
         model.to(device)
         return model
     
-# alterntaive network. TODO test    
+
 class DQNConv(nn.Module):
-    def __init__(self, max_val, board_height, board_width, layer_size, n_actions):
+    def __init__(self, max_val, board_height, board_width, layer_size, n_extra_feature, n_actions):
         super(DQNConv, self).__init__()
 
-        # 2D Convolutional layer
+        self.max_val = max_val
+        self.board_height = board_height
+        self.board_width = board_width
+        self.n_extra_feature = n_extra_feature
+
+        # 2D Convolutional layer for board
         self.conv = nn.Conv2d(in_channels=max_val, out_channels=layer_size, kernel_size=2, stride=1)
-        
+
         # Calculate the output dimensions of the convolutional layer
         conv_out_height = board_height - 1  # 2x2 kernel with stride 1
         conv_out_width = board_width - 1  # 2x2 kernel with stride 1
         self.conv_output_features = conv_out_height * conv_out_width * layer_size
 
         self.fc = nn.Sequential(
-            nn.Linear(self.conv_output_features, layer_size),
+            nn.Linear(self.conv_output_features + n_extra_feature, layer_size),
             nn.ReLU(),
             nn.Linear(layer_size, layer_size),
             nn.ReLU(),
@@ -62,7 +67,18 @@ class DQNConv(nn.Module):
         )
 
     def forward(self, x):
-        x = x.permute(0, 3, 1, 2).float()  # Rearrange from NHWC to NCHW
-        x = self.conv(x)
-        x = x.view(x.shape[0], -1)  # Flatten
-        return self.fc(x)
+        board_size = self.max_val * self.board_height * self.board_width
+
+        boards = x[:, :board_size].view(-1, self.board_height, self.board_width, self.max_val)
+        extra_features = x[:,board_size:]
+
+        # Permute dimensions to be in (batch_size, max_val, height, width) format
+        boards = boards.permute(0, 3, 1, 2)
+        
+        y = self.conv(boards)
+        y = y.view(y.shape[0], -1)
+
+        # Concatenate y with extra_features
+        z = torch.cat((y, extra_features), dim=1)
+
+        return self.fc(z)

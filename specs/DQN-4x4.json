@@ -29,5 +29,10 @@
     "test_size": 50,
 
     "human_played_games": ["4x4-02Oct-13-37","4x4-02Oct-21-09"],
-    "recall_freq": 2000
+    "recall_freq": 2000,
+
+    "up_penalty_factor": 0.5,
+    "block_moving_up": true,
+
+    "save_freq": 2000
 }
