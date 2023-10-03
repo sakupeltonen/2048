@@ -16,16 +16,23 @@ temp = [2**i for i in range(14)]
 log2 = {temp[i]: i for i in range(1,14)}
 log2[0] = 0
 
+class ExtraRewardWrapper(gym.Wrapper):
+    def __init__(self, env, reward_base):
+        super().__init__(env)
+        self.reward_base = reward_base
+
+    def step(self, move, **kwargs):
+        observation, reward, done, info = self.env.step(move, **kwargs)
+        # TODO            
+        return observation, reward, done, info
+
 
 class PenalizeMovingUpWrapper(gym.Wrapper):
     def __init__(self, env, up_penalty_factor, block_moving_up):
-        super(PenalizeMovingUpWrapper, self).__init__(env)
+        super().__init__(env)
         self.up_penalty_factor = up_penalty_factor
         self.block_moving_up = block_moving_up
 
-    def reset(self, **kwargs):
-        return self.env.reset(**kwargs)
-    
     def step(self, move, **kwargs):
         observation, reward, done, info = self.env.step(move, **kwargs)
         
@@ -33,10 +40,8 @@ class PenalizeMovingUpWrapper(gym.Wrapper):
             reward *= self.up_penalty_factor
             
         return observation, reward, done, info
-    
 
     def available_moves(self):
-        '''TEMP'''
         res = self.env.unwrapped.available_moves()
         if self.block_moving_up:
             if len(res) > 1 and 2 in res:
@@ -47,7 +52,7 @@ class PenalizeMovingUpWrapper(gym.Wrapper):
 class NextStateWrapper(gym.ObservationWrapper):
     '''Give reward and possible next state for each move'''
     def __init__(self, env):
-        super(NextStateWrapper, self).__init__(env)
+        super().__init__(env)
         self.copy_env = Env2048(width=env.unwrapped.width, height=env.unwrapped.height, 
                            prob_2=env.unwrapped.prob_2, max_tile=env.unwrapped.max_tile)
         # self.copy_env = OnehotWrapper(copy_env)
@@ -89,9 +94,6 @@ class NextStateWrapper(gym.ObservationWrapper):
         additional_obs = self.simulate_moves(self.env.unwrapped.board)
         return np.concatenate((obs.flatten(), additional_obs))
 
-    def available_moves(self):
-        return self.env.available_moves()
-
 
 def to_onehot(board, max_tile):
     n = log2[max_tile] + 1
@@ -105,7 +107,7 @@ class OnehotWrapper(gym.ObservationWrapper):
     """ Convert observation (board) to array of one-hot vectors """
 
     def __init__(self, env):
-        super(OnehotWrapper, self).__init__(env)
+        super().__init__(env)
     
     def reset(self, **kwargs):
         _board = self.env.reset(**kwargs)
@@ -120,16 +122,13 @@ class OnehotWrapper(gym.ObservationWrapper):
         # TEMP solution to get the one-hot encoded board 
         return to_onehot(self.env.unwrapped.board, self.env.unwrapped.max_tile)
     
-    def available_moves(self):
-        return self.env.available_moves()
-    
 
 class RotationInvariantWrapper(gym.ObservationWrapper):
     """Return rotated board that minimizes a hash function value. The hash is not computed explicitly for efficiency"""
     # TODO this class is outdated
     # TODO could also add flips
     def __init__(self, env):
-        super(RotationInvariantWrapper, self).__init__(env) 
+        super().__init__(env) 
 
     def minHash(self):
         rotated_boards = {i: np.rot90(self.env.unwrapped.board, i) for i in range(4)}  # 4 hardcoded
@@ -221,7 +220,7 @@ class Env2048(gym.Env):
         self.legal_move_count = 0
         
 
-    def reset(self, empty=False, custom_state=None):
+    def reset(self, empty=False, custom_state=None, **kwargs):
         self.score = 0
         self.legal_move_count = 0
         if empty: 
