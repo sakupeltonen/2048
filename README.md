@@ -30,7 +30,7 @@ This project implements DQN to the game of 2048. The agent uses Double DQN, afte
 
 **PenalizeMovingUpWrapper** An alternative to `RotationInvariantWrapper`. This wrapper simply penalizes the agent for moving up. It also has the capability to block the 'up' move by removing it from the available moves whenever other moves are available.
 
-**ExtraRewardWrapper** Can be used to customize the rewards. Normally, combining two tiles with value $x$ (where $x=2^y$ for some integer $y$) gives a reward of $2x$. This wrapper replaces the base 2 in $2^y$ with a custom `reward_base`.
+**ExtraRewardWrapper** Can be used to customize the rewards. Normally, combining two tiles with value $x$ (where $x=2 ^y$ for some integer $y$) gives a reward of $2x$. This wrapper replaces the base 2 in $2^y$ with a custom `reward_base`.
 
 
 ## DQN Agent
