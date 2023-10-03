@@ -45,12 +45,12 @@ class DQNConv(nn.Module):
         self.specs = specs
 
         # 2D Convolutional layer for board
-        self.conv = nn.Conv2d(in_channels=specs['max_val'], out_channels=32, kernel_size=2, stride=1)
+        self.conv = nn.Conv2d(in_channels=specs['max_val'], out_channels=specs['conv_out_channels'], kernel_size=2, stride=1)
 
         # Calculate the output dimensions of the convolutional layer
         conv_out_height = specs['height'] - 1  # 2x2 kernel with stride 1
         conv_out_width = specs['width'] - 1  # 2x2 kernel with stride 1
-        self.conv_output_features = conv_out_height * conv_out_width * 32
+        self.conv_output_features = conv_out_height * conv_out_width * specs['conv_out_channels']
 
         self.fc = nn.Sequential(
             nn.Linear(self.conv_output_features + n_extra_features, specs['layer_size']),
