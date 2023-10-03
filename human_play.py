@@ -8,7 +8,7 @@ import torch
 
 from environment import Env2048, OnehotWrapper, NextStateWrapper, log2
 from tools import save_game
-from dqn_model import DQN
+from dqn_model import DQN, DQNConv
 from dqn_agent import DQNAgent
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -37,6 +37,9 @@ def human_play(args):
         path = os.path.join(script_dir, specs_file)
         specs = json.load(open(path, "r"))
 
+        max_val = log2[specs['max_tile']] + 1
+        specs['max_val'] = max_val
+
         width = specs['width']
         height = specs['height']
 
@@ -47,9 +50,15 @@ def human_play(args):
         max_val = log2[specs['max_tile']] + 1
         device = torch.device('cpu')  # todo convert gpu tensors to cpu 
 
-        net_args = (max_val, specs['height'], specs['width'], specs['layer_size'], 4)
+
+        # Create Deep Q networks
+        if specs['network_type'] == 'DQN':
+            net_class = DQN
+        else:
+            assert specs['network_type'] == 'DQNConv'
+            net_class = DQNConv
         path = os.path.join(script_dir, args.net_file)
-        net = DQN.from_file(args.net_file, device, *net_args)
+        net = net_class.from_file(args.net_file, device, specs)
 
 
     def print_qvals():
@@ -116,7 +125,8 @@ def human_play(args):
                     elif event.key == pg.K_d:
                         pass
     pg.quit()
-    save_game(history, actions)
+    if not args.no_save:
+        save_game(history, actions)
 
 
 
@@ -128,7 +138,7 @@ if __name__ == "__main__":
     parser.add_argument("--net-file", default=None, type=str, help='Relative path to saved DQN model to be visualized')
     parser.add_argument("--agent-name", default=None, type=str, help='Agent name corresponding to the visualized DQN')
     parser.add_argument("--verbose", default=False, action="store_true", help='Print moves and score')
-    parser.add_argument("--no-save", default=False, action="store_true", help="Stop saveíng the played game")
+    parser.add_argument("--no-save", default=False, action="store_true", help="Stop saving the played game")
     args = parser.parse_args()
 
     # specs_file = f"specs/{args.agent_name}.json"
