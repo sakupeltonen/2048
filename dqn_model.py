@@ -82,3 +82,10 @@ class DQNConv(nn.Module):
         z = torch.cat((y, extra_features), dim=1)
 
         return self.fc(z)
+
+    @classmethod
+    def from_file(cls, path, device, max_val, board_height, board_width, layer_size, n_extra_feature, n_actions):
+        model = cls(max_val, board_height, board_width, layer_size, n_extra_feature, n_actions)
+        model.load_state_dict(torch.load(path, map_location=device))
+        model.to(device)
+        return model

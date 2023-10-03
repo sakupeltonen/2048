@@ -151,7 +151,9 @@ if __name__ == "__main__":
     # env = RotationInvariantWrapper(env)
     env = PenalizeMovingUpWrapper(env, specs['up_penalty_factor'], specs['block_moving_up'])
     env = OnehotWrapper(env)
+
     env = NextStateWrapper(env)
+    n_extra_feature = 12  # from NextStateWrapper
 
     maxval = log2[specs['max_tile']] + 1
 
