@@ -22,8 +22,7 @@ class ExtraRewardWrapper(gym.Wrapper):
         self.reward_base = reward_base
 
     def step(self, move, **kwargs):
-        observation, reward, done, info = self.env.step(move, **kwargs)
-        # TODO            
+        observation, reward, done, info = self.env.step(move, reward_base=self.reward_base, **kwargs)
         return observation, reward, done, info
 
 
@@ -326,7 +325,7 @@ class Env2048(gym.Env):
     
 
 
-    def step(self, move, generate=True):
+    def step(self, move, generate=True, reward_base=2):
         # assert isinstance(move, int)
         
         old_board = self.board.copy()  # compare with this to see if move is legal
@@ -335,9 +334,9 @@ class Env2048(gym.Env):
         self.board = np.rot90(self.board, k=move)
 
         # move tiles down in the rotated view
-        reward = self._move_down()
+        reward, true_reward = self._move_down(reward_base=reward_base)
 
-        self.score += reward
+        self.score += true_reward
 
         # reverse the rotation
         self.board = np.rot90(self.board, k=4-move)
@@ -360,11 +359,12 @@ class Env2048(gym.Env):
         return self.board, reward, done, info
 
     
-    def _move_down(self):
+    def _move_down(self, reward_base=2):
         height = len(self.board)
         width = len(self.board[0])
 
         reward = 0
+        true_reward = 0
         # Handle each column independently
         for col in range(width):
             target_row = height - 1
@@ -383,7 +383,9 @@ class Env2048(gym.Env):
                     # tiles can be combined
                     if self.board[target_row][col] == self.board[moving_row][col]:
                         self.board[target_row][col] *= 2
-                        reward += self.board[target_row][col]
+                        new_tile = self.board[target_row][col] 
+                        reward += reward_base ** log2[new_tile]
+                        true_reward += new_tile
                         self.board[moving_row][col] = 0
                         target_row -= 1
                     # tiles can't be combined. slide moving tile down
@@ -393,7 +395,7 @@ class Env2048(gym.Env):
                         self.board[moving_row][col] = 0
                         self.board[target_row-1][col] = val
                         target_row -=1
-        return reward
+        return reward, true_reward
 
     @classmethod
     def random_state(cls, width=4, height=4, max_power=6, n_tiles=8,render_mode='ansi'):

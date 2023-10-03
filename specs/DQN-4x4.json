@@ -19,7 +19,7 @@
     "replay_start_size": 5000,
     "batch_size": 16,
 
-    "gamma": 0.9,
+    "gamma": 0.95,
 
     "network_type": "DQNConv",
     "layer_size": 256,
@@ -34,6 +34,7 @@
 
     "up_penalty_factor": 0.5,
     "block_moving_up": true,
+    "reward_base": 10,
 
     "save_freq": 2000
 }
