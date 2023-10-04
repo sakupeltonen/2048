@@ -54,8 +54,7 @@ def get_program_args():
     parser.add_argument("--cuda", default=False, 
                         action="store_true", help="Enable cuda")
     parser.add_argument("--save-model", default=False, action="store_true")
-    parser.add_argument("--net-file", default=None, help="Location of DQN model")
-    parser.add_argument("--session-data-file", default=None, help="Location of session data file for continuing a previous training session")
+    parser.add_argument("--save-id", default=None, help="Name of DQN model stored in a dat file in the models directory and session data json file stored in the session_data directory")
     parser.add_argument("--colab", default=False, action="store_true", help="Set to True when running in Google Colab to make data persistent")
     args = parser.parse_args()
     return args
@@ -139,7 +138,7 @@ if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     # Get agent specifications / resume old session
-    if not args.session_data_file:
+    if not args.save_id:
         step_idx = 0
         episode_idx = 0
 
@@ -147,7 +146,7 @@ if __name__ == "__main__":
         path = os.path.join(script_dir, specs_file)
         specs = json.load(open(path, "r"))
     else:
-        path = os.path.join(script_dir, args.session_data_file)
+        path = os.path.join(script_dir, 'session_data', args.save_id + '.json')
         specs = json.load(open(path, "r"))
         step_idx = specs['step_idx']
         episode_idx = specs['episode_idx']
@@ -179,9 +178,9 @@ if __name__ == "__main__":
         assert specs['network_type'] == 'DQNConv'
         net_class = DQNConv
     
-    if args.net_file:
-        path = os.path.join(script_dir, args.net_file)
-        net = net_class.from_file(args.net_file, device, specs)
+    if args.save_id:
+        path = os.path.join(script_dir, 'models', args.save_id + '.dat')
+        net = net_class.from_file(path, device, specs)
     else:
         net = net_class(specs).to(device)
         
