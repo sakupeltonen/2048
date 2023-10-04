@@ -11,18 +11,18 @@
     "epsilon_decay_last_episode": 200000,
 
     "learning_rate": 0.005,
-    "max_lr": 0.02,
-    "min_lr": 0.002,
-    "lr_cycle_length": 50000,
+    "max_lr": 0.01,
+    "min_lr": 0.001,
+    "lr_cycle_length": 100000,
 
     "replay_size": 50000,
-    "replay_start_size": 1000,
+    "replay_start_size": 10000,
     "batch_size": 16,
 
     "gamma": 0.95,
 
     "network_type": "DQNConv",
-    "conv_out_channels": 10,
+    "conv_out_channels": 16,
     "layer_size": 64,
     "tau": 0.01,
     "sync_target_net_freq": 100,

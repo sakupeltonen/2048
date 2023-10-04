@@ -263,7 +263,8 @@ if __name__ == "__main__":
                 tgt_net.load_state_dict(net.state_dict())
             
             if args.save_model and episode_idx % specs['save_freq'] == 0:
-                session_data = {'episode_idx': episode_idx, 'step_idx': step_idx}
+                training_info = {'episode_idx': episode_idx, 'step_idx': step_idx}
+                session_data = {**specs, **training_info}
                 save_model(net, session_data, colab=args.colab, drive_dir=drive_dir)
 
             
