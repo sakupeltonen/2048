@@ -9,4 +9,4 @@
 #SBATCH --mem-per-cpu=16G
 
 source ./myenv/bin/activate
-srun python /projappl/project_2008407/senpai/main.py --cuda --agent-name 'DQN-4x4' --save-model
+srun python /projappl/project_2008407/senpai/main.py --cuda --agent-name 'DQN-3x3' --save-model
