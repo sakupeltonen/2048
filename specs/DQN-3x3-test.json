@@ -12,11 +12,13 @@
 
     "learning_rate": 0.005,
     "max_lr": 0.01,
-    "min_lr": 0.001,
+    "min_lr": 0.002,
     "lr_cycle_length": 100000,
 
     "replay_size": 300000,
-    "replay_start_size": 100000,
+    "replay_start_size": 20000,
+    "priority_exponent": 0.5,
+
     "batch_size": 16,
 
     "gamma": 0.95,

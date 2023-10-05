@@ -195,7 +195,7 @@ if __name__ == "__main__":
     writer = SummaryWriter(log_dir='runs/'+log_dir)
     
     # Initialize experience replay buffer 
-    buffer = ExperienceBuffer(specs['replay_size'])
+    buffer = ExperienceBuffer(specs['replay_size'], specs['priority_exponent'])
 
     # Initialize agent
     agent = DQNAgent(env, buffer, device=device)

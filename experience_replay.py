@@ -45,8 +45,9 @@ class SumTree:
         return (idx, self.tree[idx], self.data[dataIdx])
 
 class ExperienceBuffer:
-    def __init__(self, capacity):
+    def __init__(self, capacity, priority_exponent=0.5):
         self.tree = SumTree(capacity)
+        self.priority_exponent = priority_exponent
 
     def __len__(self):
         return len(self.tree.data)
@@ -68,3 +69,6 @@ class ExperienceBuffer:
 
     def update_priority(self, idx, priority):
         self.tree.update(idx, priority)
+
+    def get_priority(self, delta):
+        return max(1, abs(delta) ** self.priority_exponent)

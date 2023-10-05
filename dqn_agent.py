@@ -36,7 +36,7 @@ class DQNAgent:
         _, act_v = torch.max(q_vals, dim=1)
         action = int(act_v.item())
         return q_vals, action
-
+    
     @torch.no_grad()
     def play_step(self, net, epsilon=0.0):
         available_move_mask = self.env.available_moves()
@@ -61,10 +61,8 @@ class DQNAgent:
             delta = reward + q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
         else:
             delta = reward - q_vals1[0][action].item() 
-        priority = max(1, abs(delta))
+        priority = self.exp_buffer.get_priority(delta)
         self.priority = priority   # TEMP save priority to log it in main
-
-        # priority = 1
 
         exp = Experience(self.state, action, reward, is_done, self.board,
                     new_state, next_available_moves_mask, new_board)
@@ -105,7 +103,7 @@ class DQNAgent:
                 delta = reward + q_vals2[0][greedy_a2].item() - q_vals1[0][action].item()
             else:
                 delta = reward - q_vals1[0][action].item() 
-            priority = 3*max(1, abs(delta))  # NOTE: extra multiplier
+            priority = 3 * self.exp_buffer.get_priority(delta)  # NOTE: extra multiplier
 
             exp = Experience(self.state, action, reward, is_done, self.board,
                         new_state, next_available_moves_mask, new_board)
